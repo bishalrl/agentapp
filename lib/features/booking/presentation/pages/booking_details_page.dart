@@ -6,6 +6,8 @@ import '../bloc/booking_bloc.dart';
 import '../bloc/events/booking_event.dart';
 import '../bloc/states/booking_state.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/enhanced_card.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../domain/entities/booking_entity.dart';
 
 class BookingDetailsPage extends StatelessWidget {
@@ -111,18 +113,18 @@ class BookingDetailsPage extends StatelessWidget {
             }
 
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppTheme.spacingM),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _BookingHeaderCard(booking: booking),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTheme.spacingM),
                   _BusInfoCard(bus: booking.bus),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTheme.spacingM),
                   _PassengerInfoCard(booking: booking),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTheme.spacingM),
                   _PaymentInfoCard(booking: booking),
-                  const SizedBox(height: 16),
+                  const SizedBox(height: AppTheme.spacingM),
                   _BookingStatusCard(booking: booking),
                 ],
               ),
@@ -167,34 +169,98 @@ class _BookingHeaderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      color: Theme.of(context).colorScheme.primaryContainer,
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          children: [
-            Icon(
-              Icons.confirmation_number,
-              size: 64,
-              color: Theme.of(context).colorScheme.primary,
+    final theme = Theme.of(context);
+    final status = booking.status.toLowerCase();
+    Color statusColor;
+    IconData statusIcon;
+    
+    switch (status) {
+      case 'confirmed':
+        statusColor = AppTheme.successColor;
+        statusIcon = Icons.check_circle_rounded;
+        break;
+      case 'cancelled':
+        statusColor = AppTheme.errorColor;
+        statusIcon = Icons.cancel_rounded;
+        break;
+      case 'pending':
+        statusColor = AppTheme.warningColor;
+        statusIcon = Icons.pending_rounded;
+        break;
+      default:
+        statusColor = Colors.grey;
+        statusIcon = Icons.info_rounded;
+    }
+    
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
+      backgroundColor: AppTheme.primaryColor.withOpacity(0.05),
+      border: Border.all(
+        color: AppTheme.primaryColor.withOpacity(0.2),
+        width: 2,
+      ),
+      child: Column(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(AppTheme.spacingM),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.1),
+              shape: BoxShape.circle,
             ),
-            const SizedBox(height: 16),
-            Text(
-              booking.ticketNumber,
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+            child: Icon(
+              Icons.confirmation_number_rounded,
+              size: 48,
+              color: AppTheme.primaryColor,
+            ),
+          ),
+          const SizedBox(height: AppTheme.spacingM),
+          Text(
+            booking.ticketNumber,
+            style: theme.textTheme.headlineMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.primaryColor,
+              letterSpacing: 1,
+            ),
+          ),
+          const SizedBox(height: AppTheme.spacingS),
+          Container(
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.spacingM,
+              vertical: AppTheme.spacingXS,
+            ),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(AppTheme.radiusS),
+              border: Border.all(
+                color: statusColor.withOpacity(0.5),
+                width: 1.5,
+              ),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(statusIcon, size: 16, color: statusColor),
+                const SizedBox(width: AppTheme.spacingXS),
+                Text(
+                  booking.status.toUpperCase(),
+                  style: theme.textTheme.bodySmall?.copyWith(
                     fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: statusColor,
+                    fontSize: 12,
+                    letterSpacing: 0.5,
                   ),
+                ),
+              ],
             ),
-            const SizedBox(height: 8),
-            Text(
-              'Booking ID: ${booking.id.substring(0, 8)}...',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: Colors.grey[600],
-                  ),
+          ),
+          const SizedBox(height: AppTheme.spacingS),
+          Text(
+            'ID: ${booking.id.substring(0, 8)}...',
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppTheme.textTertiary,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -207,44 +273,55 @@ class _BusInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.directions_bus, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Bus Information',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+    final theme = Theme.of(context);
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppTheme.spacingS),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _InfoRow(label: 'Bus Name', value: bus.name),
-            _InfoRow(
-              label: 'Route',
-              value: '${bus.from} → ${bus.to}',
-            ),
-            _InfoRow(
-              label: 'Date',
-              value: DateFormat('EEEE, MMMM d, y').format(bus.date),
-            ),
-            _InfoRow(
-              label: 'Time',
-              value: '${bus.time}${bus.arrival != null ? ' - ${bus.arrival}' : ''}',
-            ),
-            _InfoRow(
-              label: 'Seats',
-              value: '${bus.totalSeats} total, ${bus.availableSeats} available',
-            ),
-          ],
-        ),
+                child: Icon(
+                  Icons.directions_bus_rounded,
+                  color: AppTheme.primaryColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingS),
+              Text(
+                'Bus Information',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingL),
+          _InfoRow(label: 'Bus Name', value: bus.name),
+          _InfoRow(
+            label: 'Route',
+            value: '${bus.from} → ${bus.to}',
+          ),
+          _InfoRow(
+            label: 'Date',
+            value: DateFormat('EEEE, MMMM d, y').format(bus.date),
+          ),
+          _InfoRow(
+            label: 'Time',
+            value: '${bus.time}${bus.arrival != null ? ' - ${bus.arrival}' : ''}',
+          ),
+          _InfoRow(
+            label: 'Seats',
+            value: '${bus.totalSeats} total, ${bus.availableSeats} available',
+          ),
+        ],
       ),
     );
   }
@@ -257,43 +334,54 @@ class _PassengerInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.person, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Passenger Information',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+    final theme = Theme.of(context);
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppTheme.spacingS),
+                decoration: BoxDecoration(
+                  color: AppTheme.secondaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _InfoRow(label: 'Name', value: booking.passengerName),
-            _InfoRow(label: 'Contact', value: booking.contactNumber),
-            if (booking.passengerEmail != null)
-              _InfoRow(label: 'Email', value: booking.passengerEmail!),
-            _InfoRow(
-              label: 'Seats',
-              value: booking.seatNumbers.join(', '),
-            ),
-            if (booking.pickupLocation != null)
-              _InfoRow(label: 'Pickup Location', value: booking.pickupLocation!),
-            if (booking.dropoffLocation != null)
-              _InfoRow(label: 'Dropoff Location', value: booking.dropoffLocation!),
-            if (booking.luggage != null)
-              _InfoRow(label: 'Luggage', value: booking.luggage!),
-            if (booking.bagCount != null && booking.bagCount! > 0)
-              _InfoRow(label: 'Bag Count', value: booking.bagCount!.toString()),
-          ],
-        ),
+                child: Icon(
+                  Icons.person_rounded,
+                  color: AppTheme.secondaryColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingS),
+              Text(
+                'Passenger Information',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingL),
+          _InfoRow(label: 'Name', value: booking.passengerName),
+          _InfoRow(label: 'Contact', value: booking.contactNumber),
+          if (booking.passengerEmail != null)
+            _InfoRow(label: 'Email', value: booking.passengerEmail!),
+          _InfoRow(
+            label: 'Seats',
+            value: booking.seatNumbers.map((s) => s.toString()).join(', '),
+          ),
+          if (booking.pickupLocation != null)
+            _InfoRow(label: 'Pickup Location', value: booking.pickupLocation!),
+          if (booking.dropoffLocation != null)
+            _InfoRow(label: 'Dropoff Location', value: booking.dropoffLocation!),
+          if (booking.luggage != null)
+            _InfoRow(label: 'Luggage', value: booking.luggage!),
+          if (booking.bagCount != null && booking.bagCount! > 0)
+            _InfoRow(label: 'Bag Count', value: booking.bagCount!.toString()),
+        ],
       ),
     );
   }
@@ -306,41 +394,52 @@ class _PaymentInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.payment, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Payment Information',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
+    final theme = Theme.of(context);
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppTheme.spacingS),
+                decoration: BoxDecoration(
+                  color: AppTheme.successColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
                 ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            _InfoRow(
-              label: 'Payment Method',
-              value: booking.paymentMethod.toUpperCase(),
-            ),
-            _InfoRow(
-              label: 'Price per Seat',
-              value: 'Rs. ${NumberFormat('#,##0').format(booking.price)}',
-            ),
-            const Divider(),
-            _InfoRow(
-              label: 'Total Amount',
-              value: 'Rs. ${NumberFormat('#,##0').format(booking.totalPrice)}',
-              isTotal: true,
-            ),
-          ],
-        ),
+                child: Icon(
+                  Icons.payment_rounded,
+                  color: AppTheme.successColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingS),
+              Text(
+                'Payment Information',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingL),
+          _InfoRow(
+            label: 'Payment Method',
+            value: booking.paymentMethod.toUpperCase(),
+          ),
+          _InfoRow(
+            label: 'Price per Seat',
+            value: 'Rs. ${NumberFormat('#,##0').format(booking.price)}',
+          ),
+          const Divider(height: AppTheme.spacingM),
+          _InfoRow(
+            label: 'Total Amount',
+            value: 'Rs. ${NumberFormat('#,##0').format(booking.totalPrice)}',
+            isTotal: true,
+          ),
+        ],
       ),
     );
   }
@@ -357,71 +456,104 @@ class _BookingStatusCard extends StatelessWidget {
     Color statusColor;
     IconData statusIcon;
 
+    final theme = Theme.of(context);
     switch (status) {
       case 'confirmed':
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
+        statusColor = AppTheme.successColor;
+        statusIcon = Icons.check_circle_rounded;
         break;
       case 'cancelled':
-        statusColor = Colors.red;
-        statusIcon = Icons.cancel;
+        statusColor = AppTheme.errorColor;
+        statusIcon = Icons.cancel_rounded;
         break;
       case 'pending':
-        statusColor = Colors.orange;
-        statusIcon = Icons.pending;
+        statusColor = AppTheme.warningColor;
+        statusIcon = Icons.pending_rounded;
         break;
       default:
         statusColor = Colors.grey;
-        statusIcon = Icons.info;
+        statusIcon = Icons.info_rounded;
     }
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppTheme.spacingS),
+                decoration: BoxDecoration(
+                  color: statusColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                ),
+                child: Icon(
+                  Icons.info_outline_rounded,
+                  color: statusColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingS),
+              Text(
+                'Booking Status',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingL),
+          Container(
+            padding: const EdgeInsets.all(AppTheme.spacingM),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(AppTheme.radiusM),
+              border: Border.all(
+                color: statusColor.withOpacity(0.3),
+                width: 2,
+              ),
+            ),
+            child: Row(
               children: [
-                Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Booking Status',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
+                Icon(statusIcon, color: statusColor, size: 32),
+                const SizedBox(width: AppTheme.spacingM),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        booking.status.toUpperCase(),
+                        style: theme.textTheme.titleLarge?.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: statusColor,
+                          letterSpacing: 1,
+                        ),
                       ),
+                      const SizedBox(height: AppTheme.spacingXS),
+                      Text(
+                        status == 'confirmed'
+                            ? 'This booking is confirmed'
+                            : status == 'cancelled'
+                                ? 'This booking has been cancelled'
+                                : 'This booking is pending confirmation',
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: AppTheme.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-            const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: statusColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: statusColor),
-              ),
-              child: Row(
-                children: [
-                  Icon(statusIcon, color: statusColor),
-                  const SizedBox(width: 12),
-                  Text(
-                    booking.status.toUpperCase(),
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: statusColor,
-                        ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 16),
-            _InfoRow(
-              label: 'Created At',
-              value: DateFormat('MMM d, y • h:mm a').format(booking.createdAt),
-            ),
-          ],
-        ),
+          ),
+          const SizedBox(height: AppTheme.spacingM),
+          _InfoRow(
+            label: 'Created At',
+            value: DateFormat('MMM d, y • h:mm a').format(booking.createdAt),
+          ),
+        ],
       ),
     );
   }
@@ -440,27 +572,30 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8),
+      padding: const EdgeInsets.only(bottom: AppTheme.spacingM),
       child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                  color: Colors.grey[600],
-                  fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-                ),
+          SizedBox(
+            width: 140,
+            child: Text(
+              label,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
           ),
           Expanded(
             child: Text(
               value,
               textAlign: TextAlign.right,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: isTotal ? FontWeight.bold : FontWeight.normal,
-                    color: isTotal ? Theme.of(context).colorScheme.primary : null,
-                  ),
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: isTotal ? FontWeight.bold : FontWeight.w600,
+                color: isTotal ? AppTheme.primaryColor : AppTheme.textPrimary,
+              ),
             ),
           ),
         ],

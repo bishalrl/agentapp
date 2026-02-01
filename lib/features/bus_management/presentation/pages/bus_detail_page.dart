@@ -2,13 +2,16 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/enhanced_card.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/injection/injection.dart' as di;
+import '../../../../core/utils/user_type_helper.dart';
 import '../../domain/entities/bus_entity.dart';
 import '../bloc/bus_bloc.dart';
 import '../bloc/events/bus_event.dart';
 import '../bloc/states/bus_state.dart';
 
-class BusDetailPage extends StatelessWidget {
+class BusDetailPage extends StatefulWidget {
   final String busId;
 
   const BusDetailPage({
@@ -17,7 +20,49 @@ class BusDetailPage extends StatelessWidget {
   });
 
   @override
+  State<BusDetailPage> createState() => _BusDetailPageState();
+}
+
+class _BusDetailPageState extends State<BusDetailPage> {
+  bool _isBetaAgent = false;
+  bool _isLoadingUserType = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserType();
+  }
+
+  Future<void> _checkUserType() async {
+    final isBetaAgent = await UserTypeHelper.isBetaAgent();
+    setState(() {
+      _isBetaAgent = isBetaAgent;
+      _isLoadingUserType = false;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
+    // Show loading while checking user type
+    if (_isLoadingUserType) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('Bus Details'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () {
+              if (context.canPop()) {
+                context.pop();
+              } else {
+                context.go('/buses');
+              }
+            },
+          ),
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     // Get BusBloc from context or create new one
     BusBloc? busBloc;
     try {
@@ -33,7 +78,7 @@ class BusDetailPage extends StatelessWidget {
       child: BlocBuilder<BusBloc, BusState>(
         builder: (context, state) {
           // Try to find bus in the list
-          final busIndex = state.buses.indexWhere((b) => b.id == busId);
+          final busIndex = state.buses.indexWhere((b) => b.id == widget.busId);
           
           if (busIndex == -1) {
             // Bus not found in list, show error
@@ -85,12 +130,16 @@ class BusDetailPage extends StatelessWidget {
                 },
               ),
               actions: [
-                IconButton(
-                  icon: const Icon(Icons.edit),
-                  onPressed: () {
-                    context.go('/buses/${bus.id}/edit');
-                  },
-                ),
+                // Only show edit for legacy "my buses" (buses without accessId)
+                // Beta agents have read-only access - they can view but not edit/delete
+                if (!_isBetaAgent && bus.accessId == null)
+                  IconButton(
+                    icon: const Icon(Icons.edit),
+                    onPressed: () {
+                      context.go('/buses/${bus.id}/edit');
+                    },
+                    tooltip: 'Edit Bus',
+                  ),
               ],
             ),
             body: BlocConsumer<BusBloc, BusState>(
@@ -112,58 +161,78 @@ class BusDetailPage extends StatelessWidget {
               },
               builder: (context, state) {
                 // Get updated bus from state
-                final currentBusIndex = state.buses.indexWhere((b) => b.id == busId);
+                final currentBusIndex = state.buses.indexWhere((b) => b.id == widget.busId);
                 final currentBus = currentBusIndex != -1 
                     ? state.buses[currentBusIndex] 
                     : bus;
 
+                final theme = Theme.of(context);
                 return SingleChildScrollView(
-                  padding: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(AppTheme.spacingM),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // Status Card
-                      Card(
-                        color: currentBus.isActive 
-                            ? Colors.green.withOpacity(0.1) 
-                            : Colors.red.withOpacity(0.1),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Row(
-                            children: [
-                              Icon(
+                      EnhancedCard(
+                        padding: const EdgeInsets.all(AppTheme.spacingL),
+                        backgroundColor: currentBus.isActive 
+                            ? AppTheme.successColor.withOpacity(0.1) 
+                            : AppTheme.errorColor.withOpacity(0.1),
+                        border: Border.all(
+                          color: currentBus.isActive 
+                              ? AppTheme.successColor.withOpacity(0.3) 
+                              : AppTheme.errorColor.withOpacity(0.3),
+                          width: 2,
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(AppTheme.spacingM),
+                              decoration: BoxDecoration(
+                                color: currentBus.isActive 
+                                    ? AppTheme.successColor.withOpacity(0.2) 
+                                    : AppTheme.errorColor.withOpacity(0.2),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
                                 currentBus.isActive 
-                                    ? Icons.check_circle 
-                                    : Icons.cancel,
-                                color: currentBus.isActive ? Colors.green : Colors.red,
+                                    ? Icons.check_circle_rounded 
+                                    : Icons.cancel_rounded,
+                                color: currentBus.isActive 
+                                    ? AppTheme.successColor 
+                                    : AppTheme.errorColor,
                                 size: 32,
                               ),
-                              const SizedBox(width: 16),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(
-                                      currentBus.isActive ? 'Active' : 'Inactive',
-                                      style: TextStyle(
-                                        fontSize: 20,
-                                        fontWeight: FontWeight.bold,
-                                        color: currentBus.isActive ? Colors.green : Colors.red,
-                                      ),
+                            ),
+                            const SizedBox(width: AppTheme.spacingM),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    currentBus.isActive ? 'Active' : 'Inactive',
+                                    style: theme.textTheme.headlineMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                      color: currentBus.isActive 
+                                          ? AppTheme.successColor 
+                                          : AppTheme.errorColor,
                                     ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      currentBus.isActive 
-                                          ? 'This bus is available for bookings'
-                                          : 'This bus is currently unavailable',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[700],
-                                      ),
+                                  ),
+                                  const SizedBox(height: AppTheme.spacingXS),
+                                  Text(
+                                    currentBus.isActive 
+                                        ? 'This bus is available for bookings'
+                                        : 'This bus is currently unavailable',
+                                    style: theme.textTheme.bodyMedium?.copyWith(
+                                      color: AppTheme.textSecondary,
                                     ),
-                                  ],
-                                ),
+                                  ),
+                                ],
                               ),
+                            ),
+                            // Only show activate/deactivate for legacy "my buses" (without accessId)
+                            // Beta agents have read-only access - they cannot activate/deactivate buses
+                            if (!_isBetaAgent && currentBus.accessId == null)
                               if (state.isLoading)
                                 const SizedBox(
                                   width: 20,
@@ -183,28 +252,56 @@ class BusDetailPage extends StatelessWidget {
                                   },
                                   icon: Icon(
                                     currentBus.isActive 
-                                        ? Icons.pause_circle 
-                                        : Icons.play_circle,
+                                        ? Icons.pause_circle_rounded 
+                                        : Icons.play_circle_rounded,
                                   ),
                                   label: Text(
                                     currentBus.isActive ? 'Deactivate' : 'Activate',
                                   ),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: currentBus.isActive 
-                                        ? Colors.orange 
-                                        : Colors.green,
+                                        ? AppTheme.warningColor 
+                                        : AppTheme.successColor,
                                     foregroundColor: Colors.white,
                                   ),
+                                )
+                            else
+                              // For assigned buses, show access status
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: AppTheme.spacingM,
+                                  vertical: AppTheme.spacingS,
                                 ),
-                            ],
-                          ),
+                                decoration: BoxDecoration(
+                                  color: Colors.green.shade50,
+                                  borderRadius: BorderRadius.circular(8),
+                                  border: Border.all(color: Colors.green.shade200),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+                                    const SizedBox(width: AppTheme.spacingXS),
+                                    Text(
+                                      'Assigned Bus',
+                                      style: TextStyle(
+                                        color: Colors.green.shade700,
+                                        fontWeight: FontWeight.w500,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
                         ),
                       ),
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppTheme.spacingM),
                       
                       // Basic Information
                       _InfoCard(
                         title: 'Basic Information',
+                        icon: Icons.info_rounded,
+                        iconColor: AppTheme.primaryColor,
                         children: [
                           _InfoRow(label: 'Name', value: currentBus.name),
                           _InfoRow(
@@ -218,11 +315,13 @@ class BusDetailPage extends StatelessWidget {
                         ],
                       ),
                       
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppTheme.spacingM),
                       
                       // Route Information
                       _InfoCard(
                         title: 'Route Information',
+                        icon: Icons.route_rounded,
+                        iconColor: AppTheme.secondaryColor,
                         children: [
                           _InfoRow(label: 'From', value: currentBus.from),
                           _InfoRow(label: 'To', value: currentBus.to),
@@ -236,11 +335,13 @@ class BusDetailPage extends StatelessWidget {
                         ],
                       ),
                       
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppTheme.spacingM),
                       
                       // Pricing & Seats
                       _InfoCard(
                         title: 'Pricing & Seats',
+                        icon: Icons.currency_rupee_rounded,
+                        iconColor: AppTheme.successColor,
                         children: [
                           _InfoRow(
                             label: 'Price', 
@@ -258,12 +359,14 @@ class BusDetailPage extends StatelessWidget {
                         ],
                       ),
                       
-                      const SizedBox(height: 16),
+                      const SizedBox(height: AppTheme.spacingM),
                       
                       // Driver Information
                       if (currentBus.driverContact != null || currentBus.driverId != null)
                         _InfoCard(
                           title: 'Driver Information',
+                          icon: Icons.person_rounded,
+                          iconColor: AppTheme.warningColor,
                           children: [
                             if (currentBus.driverContact != null)
                               _InfoRow(
@@ -278,12 +381,48 @@ class BusDetailPage extends StatelessWidget {
                           ],
                         ),
                       
-                      const SizedBox(height: 16),
+                      if (currentBus.driverContact != null || currentBus.driverId != null)
+                        const SizedBox(height: AppTheme.spacingM),
                       
-                      // Actions
-                      Card(
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
+                      // Access Information (for assigned buses)
+                      if (currentBus.accessId != null || (currentBus.allowedSeats != null && currentBus.allowedSeats!.isNotEmpty))
+                        EnhancedCard(
+                          padding: const EdgeInsets.all(AppTheme.spacingL),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.lock_open_rounded, color: Colors.green.shade700),
+                                  const SizedBox(width: AppTheme.spacingS),
+                                  Text(
+                                    'Access Information',
+                                    style: theme.textTheme.titleMedium?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: AppTheme.spacingM),
+                              if (currentBus.allowedSeats != null && currentBus.allowedSeats!.isNotEmpty)
+                                _InfoRow(
+                                  label: 'Allowed Seats',
+                                  value: currentBus.allowedSeats!.map((s) => s.toString()).join(', '),
+                                )
+                              else
+                                const _InfoRow(
+                                  label: 'Access Level',
+                                  value: 'Full Access (All Seats)',
+                                ),
+                            ],
+                          ),
+                        ),
+                      
+                      // Actions section - only for legacy "my buses" (without accessId)
+                      // Beta agents have read-only access - they can view bus details but cannot edit/delete
+                      if (!_isBetaAgent && currentBus.accessId == null)
+                        EnhancedCard(
+                          padding: const EdgeInsets.all(AppTheme.spacingL),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.stretch,
                             children: [
@@ -291,24 +430,78 @@ class BusDetailPage extends StatelessWidget {
                                 onPressed: () {
                                   context.go('/buses/${currentBus.id}/edit');
                                 },
-                                icon: const Icon(Icons.edit),
+                                icon: const Icon(Icons.edit_rounded),
                                 label: const Text('Edit Bus'),
                               ),
-                              const SizedBox(height: 12),
+                              const SizedBox(height: AppTheme.spacingM),
                               OutlinedButton.icon(
                                 onPressed: () {
                                   _showDeleteDialog(context, currentBus);
                                 },
-                                icon: const Icon(Icons.delete, color: Colors.red),
+                                icon: const Icon(Icons.delete_rounded, color: AppTheme.errorColor),
                                 label: const Text(
                                   'Delete Bus',
-                                  style: TextStyle(color: Colors.red),
+                                  style: TextStyle(color: AppTheme.errorColor),
                                 ),
                               ),
                             ],
                           ),
+                        )
+                      else if (_isBetaAgent)
+                        // Beta agents: Read-only access - can view details but cannot edit/delete
+                        EnhancedCard(
+                          padding: const EdgeInsets.all(AppTheme.spacingL),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: AppTheme.primaryColor),
+                                  const SizedBox(width: AppTheme.spacingS),
+                                  Expanded(
+                                    child: Text(
+                                      'Beta Agent: Read-only access. You can view bus details and make bookings, but cannot edit or delete bus data.',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: AppTheme.textSecondary,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (currentBus.accessId == null && (currentBus.allowedSeats == null || currentBus.allowedSeats!.isEmpty))
+                        // No access - show request access button
+                        EnhancedCard(
+                          padding: const EdgeInsets.all(AppTheme.spacingL),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Text(
+                                'No Access',
+                                style: theme.textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.orange.shade700,
+                                ),
+                              ),
+                              const SizedBox(height: AppTheme.spacingS),
+                              Text(
+                                'You don\'t have access to book seats on this bus. Request access from the owner.',
+                                style: theme.textTheme.bodyMedium,
+                              ),
+                              const SizedBox(height: AppTheme.spacingM),
+                              ElevatedButton.icon(
+                                onPressed: () {
+                                  context.go('/counter/request-bus-access?busId=${currentBus.id}');
+                                },
+                                icon: const Icon(Icons.request_quote),
+                                label: const Text('Request Bus Access'),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
                     ],
                   ),
                 );
@@ -378,30 +571,51 @@ class BusDetailPage extends StatelessWidget {
 class _InfoCard extends StatelessWidget {
   final String title;
   final List<Widget> children;
+  final IconData icon;
+  final Color iconColor;
 
   const _InfoCard({
     required this.title,
     required this.children,
+    this.icon = Icons.info_rounded,
+    this.iconColor = AppTheme.primaryColor,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              title,
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            ...children,
-          ],
-        ),
+    final theme = Theme.of(context);
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppTheme.spacingS),
+                decoration: BoxDecoration(
+                  color: iconColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                ),
+                child: Icon(
+                  icon,
+                  color: iconColor,
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingS),
+              Text(
+                title,
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingL),
+          ...children,
+        ],
       ),
     );
   }
@@ -418,27 +632,29 @@ class _InfoRow extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.only(bottom: AppTheme.spacingM),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           SizedBox(
-            width: 120,
+            width: 140,
             child: Text(
               label,
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 14,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                color: AppTheme.textSecondary,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ),
           Expanded(
             child: Text(
               value,
-              style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
+              textAlign: TextAlign.right,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w600,
+                color: AppTheme.textPrimary,
               ),
             ),
           ),

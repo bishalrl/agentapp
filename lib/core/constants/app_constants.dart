@@ -7,6 +7,9 @@ class AppConstants {
   static const String tokenKey = 'auth_token';
   static const String userKey = 'user_data';
   static const String onboardingKey = 'onboarding_completed';
+  // Distinguish whether the current auth token belongs to counter or driver
+  // Valid values: 'counter', 'driver'
+  static const String sessionTypeKey = 'session_type';
   
   // Timeouts
   static const int otpExpirationMinutes = 10;

@@ -9,7 +9,7 @@ class CreateBooking {
   
   Future<Result<BookingEntity>> call({
     required String busId,
-    required List<int> seatNumbers,
+    required List<dynamic> seatNumbers, // Supports both int (legacy) and String (new format)
     required String passengerName,
     required String contactNumber,
     String? passengerEmail,

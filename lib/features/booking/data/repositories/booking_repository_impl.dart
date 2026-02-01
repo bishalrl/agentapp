@@ -5,13 +5,19 @@ import '../../../../core/session/session_manager.dart';
 import '../../domain/entities/booking_entity.dart';
 import '../../domain/repositories/booking_repository.dart';
 import '../datasources/booking_remote_data_source.dart';
+import '../datasources/booking_local_data_source.dart';
 import '../../../authentication/domain/usecases/get_stored_token.dart';
 
 class BookingRepositoryImpl implements BookingRepository {
   final BookingRemoteDataSource remoteDataSource;
+  final BookingLocalDataSource localDataSource;
   final GetStoredToken getStoredToken;
   
-  BookingRepositoryImpl(this.remoteDataSource, {required this.getStoredToken});
+  BookingRepositoryImpl(
+    this.remoteDataSource,
+    this.localDataSource, {
+    required this.getStoredToken,
+  });
   
   @override
   Future<Result<List<BusInfoEntity>>> getAvailableBuses({
@@ -100,7 +106,7 @@ class BookingRepositoryImpl implements BookingRepository {
   @override
   Future<Result<BookingEntity>> createBooking({
     required String busId,
-    required List<int> seatNumbers,
+    required List<dynamic> seatNumbers, // Supports both int (legacy) and String (new format)
     required String passengerName,
     required String contactNumber,
     String? passengerEmail,
@@ -155,19 +161,37 @@ class BookingRepositoryImpl implements BookingRepository {
     String? status,
     String? paymentMethod,
   }) async {
+    // Try to get cached bookings first (for offline support)
+    List<BookingEntity> cachedBookings = [];
+    try {
+      cachedBookings = await localDataSource.getCachedBookings();
+    } catch (e) {
+      // Cache error is not critical, continue with API call
+      print('⚠️ Failed to get cached bookings: $e');
+    }
+
     final tokenResult = await getStoredToken();
     String? token;
     if (tokenResult is Error<String?>) {
+      // If we have cached data, return it even without token
+      if (cachedBookings.isNotEmpty) {
+        return Success(cachedBookings);
+      }
       return Error(AuthenticationFailure('Authentication required. Please login again.'));
     } else if (tokenResult is Success<String?>) {
       token = tokenResult.data;
     }
     
     if (token == null || token.isEmpty) {
+      // If we have cached data, return it even without token
+      if (cachedBookings.isNotEmpty) {
+        return Success(cachedBookings);
+      }
       return const Error(AuthenticationFailure('No authentication token. Please login again.'));
     }
     
     try {
+      // Fetch from API
       final bookings = await remoteDataSource.getBookings(
         date: date,
         busId: busId,
@@ -175,13 +199,55 @@ class BookingRepositoryImpl implements BookingRepository {
         paymentMethod: paymentMethod,
         token: token,
       );
+      
+      // Cache the bookings for offline access (only cache when fetching all bookings without filters)
+      if (date == null && busId == null && status == null && paymentMethod == null) {
+        try {
+          await localDataSource.cacheBookings(bookings);
+        } catch (e) {
+          // Cache error is not critical
+          print('⚠️ Failed to cache bookings: $e');
+        }
+      }
+      
       return Success(bookings);
     } on AuthenticationException catch (e) {
+      // If we have cached data, return it even on auth error
+      if (cachedBookings.isNotEmpty) {
+        return Success(cachedBookings);
+      }
       return Error(AuthenticationFailure(e.message));
+    } on NetworkException catch (e) {
+      // If we have cached data, return it on network error
+      if (cachedBookings.isNotEmpty) {
+        return Success(cachedBookings);
+      }
+      return Error(NetworkFailure(e.message));
     } on ServerException catch (e) {
+      // If we have cached data, return it on server error
+      if (cachedBookings.isNotEmpty) {
+        return Success(cachedBookings);
+      }
       return Error(ServerFailure(e.message));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      // Check if it's a network-related error
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('broken pipe') ||
+          errorString.contains('connection') ||
+          errorString.contains('network')) {
+        // If we have cached data, return it on network error
+        if (cachedBookings.isNotEmpty) {
+          return Success(cachedBookings);
+        }
+        return Error(NetworkFailure(
+          'Network connection error. Please check your internet connection and try again.'
+        ));
+      }
+      // If we have cached data, return it on any error
+      if (cachedBookings.isNotEmpty) {
+        return Success(cachedBookings);
+      }
+      return Error(ServerFailure('Failed to get bookings: ${e.toString()}'));
     }
   }
   
@@ -302,7 +368,7 @@ class BookingRepositoryImpl implements BookingRepository {
   }
   
   @override
-  Future<Result<void>> lockSeats(String busId, List<int> seatNumbers) async {
+  Future<Result<void>> lockSeats(String busId, List<dynamic> seatNumbers) async {
     final tokenResult = await getStoredToken();
     String? token;
     if (tokenResult is Error<String?>) {
@@ -328,7 +394,7 @@ class BookingRepositoryImpl implements BookingRepository {
   }
   
   @override
-  Future<Result<void>> unlockSeats(String busId, List<int> seatNumbers) async {
+  Future<Result<void>> unlockSeats(String busId, List<dynamic> seatNumbers) async {
     final tokenResult = await getStoredToken();
     String? token;
     if (tokenResult is Error<String?>) {

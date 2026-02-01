@@ -4,20 +4,47 @@ class ApiConstants {
   // For local development, use: http://YOUR_IP_ADDRESS:5000/api
   // Example: http://192.168.1.100:5000/api
   // To find your IP: Windows (ipconfig) or Mac/Linux (ifconfig)
-  static const String baseUrl = 'http://192.168.254.13:5000/api'; // ⚠️ CHANGE THIS TO YOUR SERVER IP!
-  static const String devBaseUrl = 'http://192.168.254.13:5000/api';
   
-  // Production URL (only use if server is properly deployed)
-  // static const String baseUrl = 'https://api.neelosewa.com/api';
+  // Production URL
+  static const String baseUrl ='http://147.93.152.80:5000/api';// 'http://192.168.1.68:5000/api
+  
+  // Development URLs (for local testing)
+  static const String devBaseUrl ='http://147.93.152.80:5000/api';//'http://192.168.1.64:5000/api';// 'http://192.168.1.68:5000/api';
+  //'http://192.168.1.66:5000/api';//room ko ip 
+  //'http://192.168.254.13:5000/api';//office ko ip
   
   // API Endpoints
   static const String driverInvite = '/driver/invite';
   static const String driverVerifyOtp = '/driver/verify-otp';
+  static const String driverRegister = '/driver/register'; // Independent registration (no invitation)
+  static const String driverRegisterWithInvitation = '/driver/register-with-invitation';
+  static const String driverLogin = '/driver/login';
+  static const String driverDashboard = '/driver/dashboard';
   static const String driverProfile = '/driver/profile';
   static const String driverAssignedBuses = '/driver/assigned-buses';
+  static const String driverBusDetails = '/driver/bus'; // GET /:busId
   static const String driverLocationStart = '/driver/location/start';
   static const String driverLocationStop = '/driver/location/stop';
   static const String driverTripStatus = '/driver/trip-status';
+  static const String driverMarkReached = '/driver/mark-reached';
+  static const String driverPendingRequests = '/driver/pending-requests';
+  static const String driverAcceptRequest = '/driver/accept-request'; // POST /:requestId
+  static const String driverRejectRequest = '/driver/reject-request'; // POST /:requestId
+  
+  // Driver Ride Management
+  static const String driverRideInitiate = '/driver/ride/initiate'; // POST
+  static const String driverLocationUpdate = '/driver/location/update'; // POST
+  
+  // Driver Booking
+  static const String driverBookings = '/driver/bookings'; // POST create booking
+  
+  // Driver Scan/Ticket Verification
+  static const String driverBusPassengers = '/driver/bus'; // GET /:busId/passengers
+  static const String driverScanVerifyTicket = '/driver/scan/verify-ticket'; // POST
+  
+  // Driver Permission Requests
+  static const String driverPermissionRequest = '/driver/permissions/request'; // POST
+  static const String driverPermissionRequests = '/driver/permissions/requests'; // GET
   
   static const String locationUpdate = '/location/update';
   static const String locationBusCurrent = '/location/bus';
@@ -44,16 +71,23 @@ class ApiConstants {
   static const String counterProfile = '/counter/profile';
   static const String counterMe = '/auth/me-bus-agent';
   
+  // Counter Request Management (NEW)
+  static const String counterRequestBusAccess = '/counter/request-bus-access'; // POST
+  static const String counterRequests = '/counter/requests'; // GET
+  
   // Bus Management - Assigned Buses
   static const String counterBuses = '/counter/buses'; // GET assigned buses
+  static const String counterBusSearch = '/counter/buses/search'; // GET search by vehicle number
   static const String counterBusDetails = '/counter/buses'; // GET /:busId
   
-  // Bus Management - Own Buses
-  static const String counterMyBuses = '/counter/buses/my-buses'; // GET own buses
-  static const String counterMyBusDetails = '/counter/buses/my-buses'; // GET /:busId
-  static const String counterBusCreate = '/counter/buses'; // POST to create bus
-  static const String counterMyBusUpdate = '/counter/buses/my-buses'; // PUT /:busId
-  static const String counterMyBusDelete = '/counter/buses/my-buses'; // DELETE /:busId
+  // Bus Management - Own Buses (LEGACY - Counters can no longer create buses, only owners can)
+  // These endpoints are for managing legacy buses created by counters before the change
+  static const String counterMyBuses = '/counter/buses/my-buses'; // GET own buses (legacy)
+  static const String counterMyBusDetails = '/counter/buses/my-buses'; // GET /:busId (legacy)
+  static const String counterBusCreate = '/counter/buses'; // POST to create bus (LEGACY - not recommended)
+  static const String counterMyBusUpdate = '/counter/buses/my-buses'; // PUT /:busId (legacy)
+  static const String counterMyBusDelete = '/counter/buses/my-buses'; // DELETE /:busId (legacy)
+  // NOTE: Counters should use request-bus-access to get access to owner's buses instead
   
   // Booking Management
   static const String counterBookings = '/counter/bookings';
@@ -112,5 +146,6 @@ class ApiConstants {
   // Timeouts
   static const int connectTimeout = 30000; // 30 seconds
   static const int receiveTimeout = 30000; // 30 seconds
+  static const int multipartTimeout = 120000; // 120 seconds (2 minutes) for file uploads
 }
 

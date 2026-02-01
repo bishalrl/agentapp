@@ -1,6 +1,15 @@
 import '../../domain/entities/profile_entity.dart';
 
 class ProfileModel extends ProfileEntity {
+  /// Normalize avatar URL - convert empty strings to null
+  static String? _normalizeAvatarUrl(dynamic avatarUrl) {
+    if (avatarUrl == null) return null;
+    if (avatarUrl is String) {
+      final trimmed = avatarUrl.trim();
+      return trimmed.isEmpty ? null : trimmed;
+    }
+    return avatarUrl.toString().trim().isEmpty ? null : avatarUrl.toString().trim();
+  }
   ProfileModel({
     required super.id,
     required super.agencyName,
@@ -45,7 +54,7 @@ class ProfileModel extends ProfileEntity {
       hasInternetAccess: counter['hasInternetAccess'] ?? false,
       preferredBookingMethod: counter['preferredBookingMethod'] ?? '',
       walletBalance: (counter['walletBalance'] ?? 0).toDouble(),
-      avatarUrl: counter['avatarUrl'] ?? counter['avatar'],
+      avatarUrl: ProfileModel._normalizeAvatarUrl(counter['avatarUrl'] ?? counter['avatar']),
       isVerified: counter['isVerified'] ?? false,
     );
   }

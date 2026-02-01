@@ -6,22 +6,25 @@ abstract class SignupEvent extends BaseBlocEvent {
 }
 
 class SignupRequestEvent extends SignupEvent {
+  final String type; // 'counter' or 'betaAgent'
   final String agencyName;
   final String ownerName;
+  final String? name; // Required for Beta Agent
   final String address;
   final String districtProvince;
   final String primaryContact;
   final String email;
-  final String officeLocation;
-  final String officeOpenTime;
-  final String officeCloseTime;
-  final int numberOfEmployees;
-  final bool hasDeviceAccess;
-  final bool hasInternetAccess;
-  final String preferredBookingMethod;
+  final String? officeLocation; // Required for Counter only
+  final String? officeOpenTime; // Required for Counter only
+  final String? officeCloseTime; // Required for Counter only
+  final int? numberOfEmployees; // Required for Counter only
+  final bool? hasDeviceAccess; // Required for Counter only
+  final bool? hasInternetAccess; // Required for Counter only
+  final String? preferredBookingMethod; // Required for Counter only
   final String password;
   final File citizenshipFile;
   final File photoFile;
+  final File? nameMatchImage; // Optional for Beta Agent
   final String? panVatNumber;
   final String? alternateContact;
   final String? whatsappViber;
@@ -29,22 +32,25 @@ class SignupRequestEvent extends SignupEvent {
   final File? registrationFile;
 
   const SignupRequestEvent({
+    required this.type,
     required this.agencyName,
     required this.ownerName,
+    this.name,
     required this.address,
     required this.districtProvince,
     required this.primaryContact,
     required this.email,
-    required this.officeLocation,
-    required this.officeOpenTime,
-    required this.officeCloseTime,
-    required this.numberOfEmployees,
-    required this.hasDeviceAccess,
-    required this.hasInternetAccess,
-    required this.preferredBookingMethod,
+    this.officeLocation,
+    this.officeOpenTime,
+    this.officeCloseTime,
+    this.numberOfEmployees,
+    this.hasDeviceAccess,
+    this.hasInternetAccess,
+    this.preferredBookingMethod,
     required this.password,
     required this.citizenshipFile,
     required this.photoFile,
+    this.nameMatchImage,
     this.panVatNumber,
     this.alternateContact,
     this.whatsappViber,
@@ -54,8 +60,10 @@ class SignupRequestEvent extends SignupEvent {
 
   @override
   List<Object?> get props => [
+        type,
         agencyName,
         ownerName,
+        name,
         address,
         districtProvince,
         primaryContact,
@@ -70,6 +78,7 @@ class SignupRequestEvent extends SignupEvent {
         password,
         citizenshipFile,
         photoFile,
+        nameMatchImage,
         panVatNumber,
         alternateContact,
         whatsappViber,

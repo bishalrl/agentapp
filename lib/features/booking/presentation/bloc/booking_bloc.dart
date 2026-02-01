@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/booking_entity.dart';
 import '../../domain/usecases/create_booking.dart';
 import '../../domain/usecases/get_available_buses.dart';
@@ -71,13 +72,8 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
       print('   ❌ GetBuses Error: ${failure.message}');
       print('   Failure type: ${failure.runtimeType}');
       
-      // Provide user-friendly error message
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       
       emit(state.copyWith(
         isLoading: false,
@@ -122,13 +118,8 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
       print('   ❌ CreateBooking Error: ${failure.message}');
       print('   Failure type: ${failure.runtimeType}');
       
-      // Provide user-friendly error message
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       
       emit(state.copyWith(
         isLoading: false,
@@ -205,14 +196,8 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     final result = await getBusDetails(event.busId);
     if (result is Error<BusInfoEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else if (failure is NetworkFailure) {
-        errorMessage = 'Network error: ${failure.message}. Please check your internet connection.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<BusInfoEntity>) {
       emit(state.copyWith(
@@ -236,14 +221,8 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     );
     if (result is Error<List<BookingEntity>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else if (failure is NetworkFailure) {
-        errorMessage = 'Network error: ${failure.message}. Please check your internet connection.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<List<BookingEntity>>) {
       emit(state.copyWith(
@@ -262,14 +241,8 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     final result = await getBookingDetails(event.bookingId);
     if (result is Error<BookingEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else if (failure is NetworkFailure) {
-        errorMessage = 'Network error: ${failure.message}. Please check your internet connection.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<BookingEntity>) {
       emit(state.copyWith(

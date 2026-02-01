@@ -8,7 +8,7 @@ class LockSeats {
   
   Future<Result<void>> call({
     required String busId,
-    required List<int> seatNumbers,
+    required List<dynamic> seatNumbers, // Supports both int (legacy) and String (new format)
   }) async {
     return await repository.lockSeats(busId, seatNumbers);
   }

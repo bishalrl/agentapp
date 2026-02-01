@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/usecases/login.dart';
 import '../../domain/usecases/logout.dart';
 import '../../domain/usecases/get_stored_token.dart';
@@ -33,34 +34,15 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(state.copyWith(isLoading: true, errorMessage: null));
     print('   State emitted: isLoading=true');
 
-    final result = await login(event.email, event.password);
+    final result = await login(event.email, event.password, loginType: event.loginType);
 
     if (result is Error<AuthEntity>) {
       final failure = result.failure;
       print('   ❌ Login Error: ${failure.message}');
       print('   Failure type: ${failure.runtimeType}');
       
-      // Provide user-friendly error message
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Invalid email or password. Please try again.';
-      } else if (failure is NetworkFailure) {
-        // Provide user-friendly network error messages
-        final message = failure.message.toLowerCase();
-        if (message.contains('no route to host') || 
-            message.contains('connection refused') ||
-            message.contains('failed host lookup')) {
-          errorMessage = 'Unable to connect to server. Please check your internet connection and try again.';
-        } else if (message.contains('timeout')) {
-          errorMessage = 'Connection timeout. Please check your internet connection and try again.';
-        } else if (message.contains('no internet')) {
-          errorMessage = 'No internet connection. Please check your network settings.';
-        } else {
-          errorMessage = 'Network error. Please check your internet connection and try again.';
-        }
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       
       // CRITICAL: Set isAuthenticated to false on login failure
       emit(state.copyWith(
@@ -94,9 +76,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     final result = await logout();
 
     if (result is Error<void>) {
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(result.failure);
       emit(state.copyWith(
         isLoading: false,
-        errorMessage: result.failure.message,
+        errorMessage: errorMessage,
       ));
     } else if (result is Success<void>) {
       emit(const AuthState(

@@ -10,6 +10,7 @@ import '../bloc/states/login_page_state.dart';
 import '../../../../core/widgets/error_snackbar.dart';
 import '../../../../core/widgets/back_button_handler.dart';
 import '../../../../core/utils/bloc_extensions.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class LoginPage extends StatelessWidget {
   const LoginPage({super.key});
@@ -36,6 +37,7 @@ class _LoginPageViewState extends State<_LoginPageView> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _isNavigating = false;
+  String loginType = 'counter'; // 'counter' or 'betaAgent'
 
   @override
   void dispose() {
@@ -48,18 +50,8 @@ class _LoginPageViewState extends State<_LoginPageView> {
   Widget build(BuildContext context) {
     return ExitOnDoubleBack(
       child: Scaffold(
-      body: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              Theme.of(context).colorScheme.primary,
-              Theme.of(context).colorScheme.primaryContainer,
-            ],
-          ),
-        ),
-        child: SafeArea(
+        backgroundColor: AppTheme.backgroundColor,
+        body: SafeArea(
           child: BlocConsumer<AuthBloc, AuthState>(
             listener: (context, state) {
               // Prevent multiple navigations
@@ -120,24 +112,24 @@ class _LoginPageViewState extends State<_LoginPageView> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const SizedBox(height: 60),
+                          const SizedBox(height: 40),
                           Container(
-                            padding: const EdgeInsets.all(24),
+                            padding: const EdgeInsets.all(20),
                             decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.2),
+                              color: AppTheme.surfaceColor,
                               shape: BoxShape.circle,
                             ),
-                            child: const Icon(
-                              Icons.business,
-                              size: 80,
-                              color: Colors.white,
+                            child: Icon(
+                              loginType == 'counter' ? Icons.business : Icons.person,
+                              size: 64,
+                              color: AppTheme.primaryColor,
                             ),
                           ),
                           const SizedBox(height: 32),
                           Text(
-                            'Counter Login',
+                            loginType == 'counter' ? 'Counter Login' : 'Beta Agent Login',
                             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
-                                  color: Colors.white,
+                                  color: AppTheme.textPrimary,
                                   fontWeight: FontWeight.bold,
                                 ),
                           ),
@@ -145,15 +137,114 @@ class _LoginPageViewState extends State<_LoginPageView> {
                           Text(
                             'Sign in to manage your bookings',
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  color: Colors.white70,
+                                  color: AppTheme.textSecondary,
                                 ),
                           ),
-                          const SizedBox(height: 48),
-                          Card(
-                            elevation: 8,
-                            shape: RoundedRectangleBorder(
+                          const SizedBox(height: 32),
+                          // Login Type Toggle
+                          Container(
+                            decoration: BoxDecoration(
+                              color: Colors.grey[100],
                               borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.grey[300]!),
                             ),
+                            child: Row(
+                              children: [
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        loginType = 'counter';
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      decoration: BoxDecoration(
+                                        color: loginType == 'counter'
+                                            ? Theme.of(context).colorScheme.primary
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.business_center,
+                                            color: loginType == 'counter'
+                                                ? Colors.white
+                                                : Colors.grey[600],
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Counter',
+                                            style: TextStyle(
+                                              color: loginType == 'counter'
+                                                  ? Colors.white
+                                                  : Colors.grey[600],
+                                              fontWeight: loginType == 'counter'
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                Expanded(
+                                  child: InkWell(
+                                    onTap: () {
+                                      setState(() {
+                                        loginType = 'betaAgent';
+                                      });
+                                    },
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(vertical: 16),
+                                      decoration: BoxDecoration(
+                                        color: loginType == 'betaAgent'
+                                            ? Theme.of(context).colorScheme.primary
+                                            : Colors.transparent,
+                                        borderRadius: BorderRadius.circular(16),
+                                      ),
+                                      child: Row(
+                                        mainAxisAlignment: MainAxisAlignment.center,
+                                        children: [
+                                          Icon(
+                                            Icons.person_outline,
+                                            color: loginType == 'betaAgent'
+                                                ? Colors.white
+                                                : Colors.grey[600],
+                                          ),
+                                          const SizedBox(width: 8),
+                                          Text(
+                                            'Beta Agent',
+                                            style: TextStyle(
+                                              color: loginType == 'betaAgent'
+                                                  ? Colors.white
+                                                  : Colors.grey[600],
+                                              fontWeight: loginType == 'betaAgent'
+                                                  ? FontWeight.bold
+                                                  : FontWeight.normal,
+                                              fontSize: 16,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 32),
+                          Card(
+                            elevation: 0,
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                              side: BorderSide(color: Colors.grey.shade100, width: 0.5),
+                            ),
+                            color: AppTheme.backgroundColor,
                             child: Padding(
                               padding: const EdgeInsets.all(24.0),
                               child: Column(
@@ -230,6 +321,7 @@ class _LoginPageViewState extends State<_LoginPageView> {
                                                       LoginEvent(
                                                         email: emailController.text,
                                                         password: passwordController.text,
+                                                        loginType: loginType,
                                                       ),
                                                     );
                                                     print('✅ LoginEvent added successfully');
@@ -276,10 +368,26 @@ class _LoginPageViewState extends State<_LoginPageView> {
                                         context.go('/forgot-password');
                                       },
                                       style: TextButton.styleFrom(
-                                        foregroundColor: Colors.black,
+                                        foregroundColor: AppTheme.textSecondary,
                                         padding: const EdgeInsets.symmetric(horizontal: 8),
                                       ),
                                       child: const Text('Forgot Password?'),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 16),
+                                  // "I'm a Driver" button
+                                  SizedBox(
+                                    width: double.infinity,
+                                    child: OutlinedButton.icon(
+                                      onPressed: () {
+                                        context.go('/driver/login');
+                                      },
+                                      icon: const Icon(Icons.drive_eta),
+                                      label: const Text("I'm a Driver"),
+                                      style: OutlinedButton.styleFrom(
+                                        padding: const EdgeInsets.symmetric(vertical: 12),
+                                        side: BorderSide(color: Theme.of(context).colorScheme.primary),
+                                      ),
                                     ),
                                   ),
                                   const SizedBox(height: 16),
@@ -289,7 +397,7 @@ class _LoginPageViewState extends State<_LoginPageView> {
                                       Text(
                                         'Don\'t have an account? ',
                                         style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                              color: Colors.black,
+                                              color: AppTheme.textSecondary,
                                             ),
                                       ),
                                       TextButton(
@@ -297,7 +405,7 @@ class _LoginPageViewState extends State<_LoginPageView> {
                                           context.go('/signup');
                                         },
                                         style: TextButton.styleFrom(
-                                          foregroundColor: Colors.black,
+                                          foregroundColor: AppTheme.primaryColor,
                                         ),
                                         child: const Text('Sign Up'),
                                       ),
@@ -316,7 +424,6 @@ class _LoginPageViewState extends State<_LoginPageView> {
             },
           ),
         ),
-      ),
       ),
     );
   }

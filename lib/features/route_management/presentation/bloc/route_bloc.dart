@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/route_entity.dart';
 import '../../domain/usecases/create_route.dart';
 import '../../domain/usecases/update_route.dart';
@@ -48,12 +49,8 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
 
     if (result is Error<RouteEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(
         isLoading: false,
         errorMessage: errorMessage,
@@ -86,12 +83,8 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
 
     if (result is Error<RouteEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<RouteEntity>) {
       final updatedRoute = result.data;
@@ -117,12 +110,8 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
 
     if (result is Error<void>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<void>) {
       final updatedRoutes = state.routes.where((route) => route.id != event.routeId).toList();
@@ -144,12 +133,8 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
 
     if (result is Error<List<RouteEntity>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<List<RouteEntity>>) {
       emit(state.copyWith(
@@ -169,12 +154,8 @@ class RouteBloc extends Bloc<RouteEvent, RouteState> {
 
     if (result is Error<RouteEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<RouteEntity>) {
       emit(state.copyWith(

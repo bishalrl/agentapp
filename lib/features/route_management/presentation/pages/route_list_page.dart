@@ -239,6 +239,7 @@ class RouteListPage extends StatelessWidget {
             },
           ),
           floatingActionButton: FloatingActionButton.extended(
+            heroTag: 'route_list_fab', // Unique tag to avoid Hero widget conflicts
             onPressed: () {
               context.go('/routes/create');
             },

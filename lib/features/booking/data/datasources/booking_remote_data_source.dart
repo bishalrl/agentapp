@@ -13,7 +13,7 @@ abstract class BookingRemoteDataSource {
   Future<BusInfoModel> getBusDetails(String busId, String token);
   Future<BookingModel> createBooking({
     required String busId,
-    required List<int> seatNumbers,
+    required List<dynamic> seatNumbers, // Supports both int (legacy) and String (new format)
     required String passengerName,
     required String contactNumber,
     String? passengerEmail,
@@ -42,8 +42,8 @@ abstract class BookingRemoteDataSource {
     required String status,
     required String token,
   });
-  Future<void> lockSeats(String busId, List<int> seatNumbers, String token);
-  Future<void> unlockSeats(String busId, List<int> seatNumbers, String token);
+  Future<void> lockSeats(String busId, List<dynamic> seatNumbers, String token); // Supports both int and String
+  Future<void> unlockSeats(String busId, List<dynamic> seatNumbers, String token); // Supports both int and String
 }
 
 class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
@@ -110,18 +110,65 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
       
       print('📥 BookingRemoteDataSource.getBusDetails: Response received');
       print('   Success: ${response['success']}');
+      print('   Data keys: ${response['data'] is Map ? (response['data'] as Map).keys.toList() : 'N/A'}');
       
       if (response['success'] == true && response['data'] != null) {
         final data = response['data'] as Map<String, dynamic>;
-        // Handle response format: data can have 'bus' key or be bus object directly
+        print('   Top-level data keys: ${data.keys.toList()}');
+        // New response format: {bus: {...}, hasAccess: bool, allowedSeats: [...], ...}
+        // Also supports old format: {bus: {...}} or bus object directly
         final busData = data['bus'] ?? data;
         
         if (busData is! Map<String, dynamic>) {
           throw ServerException('Invalid bus data format in response');
         }
         
-        print('   ✅ Parsing bus details');
-        return BusInfoModel.fromJson(busData);
+        // Extract all access-related fields from top-level data object
+        // These fields come from the API response but may not be in the bus object
+        final hasAccess = data['hasAccess'] as bool?;
+        final allowedSeats = data['allowedSeats'] as List<dynamic>?;
+        final allowedSeatsCount = data['allowedSeatsCount'] as int?;
+        final hasRestrictedAccess = data['hasRestrictedAccess'] as bool?;
+        final hasFullAccess = data['hasFullAccess'] as bool?;
+        final hasNoAccess = data['hasNoAccess'] as bool?;
+        final availableAllowedSeats = data['availableAllowedSeats'] as List<dynamic>?;
+        final availableAllowedSeatsCount = data['availableAllowedSeatsCount'] as int?;
+        
+        // Extract debug and message fields for troubleshooting
+        final debug = data['debug'] as Map<String, dynamic>?;
+        final message = data['message'] as String?;
+        
+        print('   ℹ️ Access Information:');
+        print('      HasAccess: $hasAccess');
+        print('      AllowedSeats: $allowedSeats');
+        print('      HasRestrictedAccess: $hasRestrictedAccess');
+        print('      HasFullAccess: $hasFullAccess');
+        print('      HasNoAccess: $hasNoAccess');
+        print('      AvailableAllowedSeats: $availableAllowedSeats');
+        if (message != null) {
+          print('      Message: $message');
+        }
+        if (debug != null) {
+          print('      Debug Info: $debug');
+        }
+        
+        // Merge all access-related fields into busData so they get parsed into the model
+        // Top-level data fields take precedence as they are the authoritative source from API
+        final mergedBusData = <String, dynamic>{
+          ...busData,
+          // Override with top-level access fields if they exist (they are authoritative)
+          if (hasAccess != null) 'hasAccess': hasAccess,
+          if (allowedSeats != null) 'allowedSeats': allowedSeats,
+          if (allowedSeatsCount != null) 'allowedSeatsCount': allowedSeatsCount,
+          if (hasRestrictedAccess != null) 'hasRestrictedAccess': hasRestrictedAccess,
+          if (hasFullAccess != null) 'hasFullAccess': hasFullAccess,
+          if (hasNoAccess != null) 'hasNoAccess': hasNoAccess,
+          if (availableAllowedSeats != null) 'availableAllowedSeats': availableAllowedSeats,
+          if (availableAllowedSeatsCount != null) 'availableAllowedSeatsCount': availableAllowedSeatsCount,
+        };
+        
+        print('   ✅ Parsing bus details with merged access information');
+        return BusInfoModel.fromJson(mergedBusData);
       } else {
         throw ServerException(response['message'] as String? ?? 'Failed to get bus details');
       }
@@ -136,7 +183,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
   @override
   Future<BookingModel> createBooking({
     required String busId,
-    required List<int> seatNumbers,
+    required List<dynamic> seatNumbers, // Supports both int (legacy) and String (new format)
     required String passengerName,
     required String contactNumber,
     String? passengerEmail,
@@ -150,10 +197,52 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     try {
       print('📤 BookingRemoteDataSource.createBooking: Sending request');
       print('   BusId: $busId, Seats: $seatNumbers, Passenger: $passengerName');
+      print('   Seat numbers (raw): $seatNumbers');
+      
+      // Normalize seat numbers: Convert numeric strings to numbers, keep non-numeric as strings
+      // This matches backend normalization logic
+      final seatNumbersForApi = seatNumbers.map((seat) {
+        if (seat == null) return null;
+        
+        // If already a number, keep as number
+        if (seat is int) {
+          print('   Seat $seat: Already int');
+          return seat;
+        }
+        
+        // If string, try to parse as number
+        if (seat is String) {
+          final trimmed = seat.trim();
+          if (trimmed.isEmpty) return null;
+          
+          // Try parsing as number
+          final numValue = int.tryParse(trimmed);
+          if (numValue != null && trimmed == numValue.toString()) {
+            // It's a numeric string like "1", "2", "3" - convert to int
+            print('   Seat "$seat": Converting to int $numValue');
+            return numValue;
+          } else {
+            // Non-numeric string like "A1", "B2" - keep as string
+            print('   Seat "$seat": Keeping as string');
+            return trimmed;
+          }
+        }
+        
+        // For other types, convert to string
+        final str = seat.toString().trim();
+        if (str.isEmpty) return null;
+        final numValue = int.tryParse(str);
+        if (numValue != null && str == numValue.toString()) {
+          return numValue;
+        }
+        return str;
+      }).where((seat) => seat != null).toList();
+      
+      print('   Seat numbers (normalized): $seatNumbersForApi');
       
       final body = <String, dynamic>{
         'busId': busId,
-        'seatNumbers': seatNumbers,
+        'seatNumbers': seatNumbersForApi,
         'passengerName': passengerName,
         'contactNumber': contactNumber,
         'paymentMethod': paymentMethod,
@@ -198,11 +287,49 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
         print('   ✅ Parsing booking data');
         return BookingModel.fromJson(bookingData);
       } else {
-        throw ServerException(response['message'] as String? ?? 'Failed to create booking');
+        // Enhanced error handling for new backend error format with debug information
+        final message = response['message'] as String? ?? 'Failed to create booking';
+        final allowedSeats = response['allowedSeats'] as List<dynamic>?;
+        final allowedSeatsAsStrings = response['allowedSeatsAsStrings'] as List<dynamic>?;
+        final allowedSeatsAsNumbers = response['allowedSeatsAsNumbers'] as List<dynamic>?;
+        final requestedSeats = response['requestedSeats'] as List<dynamic>?;
+        final requestedSeatsNormalized = response['requestedSeatsNormalized'] as List<dynamic>?;
+        final notAllowedSeats = response['notAllowedSeats'] as List<dynamic>?;
+        final debug = response['debug'] as Map<String, dynamic>?;
+        
+        // Log debug information for troubleshooting
+        print('❌ BookingRemoteDataSource.createBooking: Error response');
+        print('   Message: $message');
+        print('   Allowed Seats: $allowedSeats');
+        print('   Allowed Seats (as strings): $allowedSeatsAsStrings');
+        print('   Allowed Seats (as numbers): $allowedSeatsAsNumbers');
+        print('   Requested Seats: $requestedSeats');
+        print('   Requested Seats (normalized): $requestedSeatsNormalized');
+        print('   Not Allowed Seats: $notAllowedSeats');
+        if (debug != null) {
+          print('   Debug Info: $debug');
+        }
+        
+        // Build detailed error message
+        String errorMessage = message;
+        if (notAllowedSeats != null && notAllowedSeats.isNotEmpty) {
+          final notAllowedStr = notAllowedSeats.map((s) => s.toString()).join(', ');
+          if (allowedSeatsAsStrings != null && allowedSeatsAsStrings.isNotEmpty) {
+            final allowedStr = allowedSeatsAsStrings.map((s) => s.toString()).join(', ');
+            errorMessage = '$message\n\nNot allowed seats: $notAllowedStr\nAllowed seats: $allowedStr';
+          } else {
+            errorMessage = '$message\n\nNot allowed seats: $notAllowedStr';
+          }
+        } else if (allowedSeatsAsStrings != null && allowedSeatsAsStrings.isEmpty) {
+          errorMessage = '$message\n\nYou do not have permission to book any seats on this bus.';
+        }
+        
+        throw ServerException(errorMessage);
       }
     } on ServerException {
       rethrow;
     } catch (e) {
+      print('❌ BookingRemoteDataSource.createBooking: Unexpected error: $e');
       throw ServerException('Failed to create booking: ${e.toString()}');
     }
   }
@@ -302,7 +429,18 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
       }
     } on ServerException {
       rethrow;
+    } on NetworkException {
+      rethrow;
     } catch (e) {
+      // Check if it's a network-related error
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('broken pipe') ||
+          errorString.contains('connection closed') ||
+          errorString.contains('connection') && errorString.contains('closed')) {
+        throw NetworkException(
+          'Network connection error. Please check your internet connection and try again.'
+        );
+      }
       throw ServerException('Failed to get bookings: ${e.toString()}');
     }
   }
@@ -416,8 +554,31 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
   }
   
   @override
-  Future<void> lockSeats(String busId, List<int> seatNumbers, String token) async {
+  Future<void> lockSeats(String busId, List<dynamic> seatNumbers, String token) async {
     try {
+      // Normalize seat numbers: Convert numeric strings to numbers, keep non-numeric as strings
+      final seatNumbersForApi = seatNumbers.map((seat) {
+        if (seat == null) return null;
+        if (seat is int) return seat;
+        if (seat is num) return seat.toInt();
+        if (seat is String) {
+          final trimmed = seat.trim();
+          if (trimmed.isEmpty) return null;
+          final numValue = int.tryParse(trimmed);
+          if (numValue != null && trimmed == numValue.toString()) {
+            return numValue;
+          }
+          return trimmed;
+        }
+        final str = seat.toString().trim();
+        if (str.isEmpty) return null;
+        final numValue = int.tryParse(str);
+        if (numValue != null && str == numValue.toString()) {
+          return numValue;
+        }
+        return str;
+      }).where((seat) => seat != null).toList();
+      
       final response = await apiClient.post(
         seatNumbers.length == 1 ? ApiConstants.seatLock : ApiConstants.seatLockMultiple,
         headers: {
@@ -425,8 +586,8 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
         },
         body: {
           'busId': busId,
-          if (seatNumbers.length == 1) 'seatNumber': seatNumbers.first,
-          if (seatNumbers.length > 1) 'seatNumbers': seatNumbers,
+          if (seatNumbers.length == 1) 'seatNumber': seatNumbersForApi.first,
+          if (seatNumbers.length > 1) 'seatNumbers': seatNumbersForApi,
         },
       );
       
@@ -441,8 +602,31 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
   }
   
   @override
-  Future<void> unlockSeats(String busId, List<int> seatNumbers, String token) async {
+  Future<void> unlockSeats(String busId, List<dynamic> seatNumbers, String token) async {
     try {
+      // Normalize seat numbers: Convert numeric strings to numbers, keep non-numeric as strings
+      final seatNumbersForApi = seatNumbers.map((seat) {
+        if (seat == null) return null;
+        if (seat is int) return seat;
+        if (seat is num) return seat.toInt();
+        if (seat is String) {
+          final trimmed = seat.trim();
+          if (trimmed.isEmpty) return null;
+          final numValue = int.tryParse(trimmed);
+          if (numValue != null && trimmed == numValue.toString()) {
+            return numValue;
+          }
+          return trimmed;
+        }
+        final str = seat.toString().trim();
+        if (str.isEmpty) return null;
+        final numValue = int.tryParse(str);
+        if (numValue != null && str == numValue.toString()) {
+          return numValue;
+        }
+        return str;
+      }).where((seat) => seat != null).toList();
+      
       final response = await apiClient.post(
         ApiConstants.seatUnlock,
         headers: {
@@ -450,7 +634,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
         },
         body: {
           'busId': busId,
-          'seatNumber': seatNumbers.first, // API might need individual calls
+          'seatNumber': seatNumbersForApi.first, // API might need individual calls
         },
       );
       

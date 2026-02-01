@@ -6,6 +6,10 @@ import '../bloc/booking_bloc.dart';
 import '../bloc/events/booking_event.dart';
 import '../bloc/states/booking_state.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/enhanced_card.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/injection/injection.dart' as di;
+import '../../../../core/utils/user_type_helper.dart';
 import '../../domain/entities/booking_entity.dart';
 
 class CreateBookingPage extends StatefulWidget {
@@ -26,8 +30,24 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
   
   String? _selectedBusId;
   String _selectedPaymentMethod = 'cash';
-  List<int> _selectedSeats = [];
+  List<dynamic> _selectedSeats = []; // Supports both int (legacy) and String (new format)
   int _bagCount = 0;
+  bool _isBetaAgent = false;
+  bool _isLoadingUserType = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkUserType();
+  }
+
+  Future<void> _checkUserType() async {
+    final isBetaAgent = await UserTypeHelper.isBetaAgent();
+    setState(() {
+      _isBetaAgent = isBetaAgent;
+      _isLoadingUserType = false;
+    });
+  }
   
   @override
   void dispose() {
@@ -42,8 +62,17 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
 
   @override
   Widget build(BuildContext context) {
+    // Show loading while checking user type
+    if (_isLoadingUserType) {
+      return Scaffold(
+        appBar: AppBar(title: const Text('Create Booking')),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return BlocProvider(
-      create: (context) => context.read<BookingBloc>()..add(const GetAvailableBusesEvent()),
+      // Use a fresh BookingBloc instance from DI to avoid using a closed bloc
+      create: (context) => di.sl<BookingBloc>()..add(const GetAvailableBusesEvent()),
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Create Booking'),
@@ -92,7 +121,7 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
             }
 
             return SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(AppTheme.spacingM),
               child: Form(
                 key: _formKey,
                 child: Column(
@@ -113,26 +142,68 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                     const SizedBox(height: 24),
                     
                     // Step 2: Seat Selection (only if bus is selected)
-                    if (_selectedBusId != null && state.selectedBus != null)
-                      _SeatSelectionSection(
-                        bus: state.selectedBus!,
-                        selectedSeats: _selectedSeats,
-                        onSeatsChanged: (seats) {
-                          setState(() {
-                            _selectedSeats = seats;
-                          });
-                        },
-                        onLockSeats: (seats) {
-                          context.read<BookingBloc>().add(
-                            LockSeatsEvent(busId: _selectedBusId!, seatNumbers: seats),
-                          );
-                        },
-                        onUnlockSeats: (seats) {
-                          context.read<BookingBloc>().add(
-                            UnlockSeatsEvent(busId: _selectedBusId!, seatNumbers: seats),
-                          );
-                        },
-                      ),
+                    if (_selectedBusId != null && state.selectedBus != null) ...[
+                      // Check hasAccess before rendering seat map
+                      if (state.selectedBus!.hasAccess == false || 
+                          (state.selectedBus!.hasAccess == null && 
+                           state.selectedBus!.hasNoAccess == true)) ...[
+                        // No access - show message instead of seat map
+                        EnhancedCard(
+                          child: Container(
+                            padding: const EdgeInsets.all(AppTheme.spacingL),
+                            child: Column(
+                              children: [
+                                Icon(
+                                  Icons.block,
+                                  size: 64,
+                                  color: Colors.red[400],
+                                ),
+                                const SizedBox(height: AppTheme.spacingM),
+                                Text(
+                                  'No Access',
+                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.red[700],
+                                      ),
+                                ),
+                                const SizedBox(height: AppTheme.spacingS),
+                                Text(
+                                  state.selectedBus!.hasAccess == false
+                                      ? 'You do not have access to this bus. Please request access first.'
+                                      : 'You do not have permission to book seats on this bus.',
+                                  textAlign: TextAlign.center,
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                        color: Colors.grey[700],
+                                      ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ] else ...[
+                        // Has access - show seat selection
+                        _SeatSelectionSection(
+                          bus: state.selectedBus!,
+                          selectedSeats: _selectedSeats,
+                          isBetaAgent: _isBetaAgent,
+                          onSeatsChanged: (seats) {
+                            setState(() {
+                              _selectedSeats = seats;
+                            });
+                          },
+                          onLockSeats: (seats) {
+                            context.read<BookingBloc>().add(
+                              LockSeatsEvent(busId: _selectedBusId!, seatNumbers: seats),
+                            );
+                          },
+                          onUnlockSeats: (seats) {
+                            context.read<BookingBloc>().add(
+                              UnlockSeatsEvent(busId: _selectedBusId!, seatNumbers: seats),
+                            );
+                          },
+                        ),
+                      ],
+                    ],
                     
                     if (_selectedBusId != null && state.selectedBus != null) ...[
                       const SizedBox(height: 24),
@@ -228,6 +299,143 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
          ErrorSnackBar(message: 'Please select at least one seat'),
       );
       return;
+    }
+
+    // Validate seat access before API call
+    final selectedBus = state.selectedBus;
+    if (selectedBus != null) {
+      // Check if counter has no access
+      if (selectedBus.hasNoAccess == true || selectedBus.hasAccess == false) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          ErrorSnackBar(
+            message: selectedBus.hasAccess == false
+                ? 'You do not have access to this bus. Please request access first.'
+                : 'You do not have permission to book seats on this bus.',
+          ),
+        );
+        return;
+      }
+
+      // Normalize selected seats for comparison (matches backend normalization)
+      // Convert numeric strings to numbers, keep non-numeric as strings
+      final normalizedSelectedSeats = _selectedSeats.map((seat) {
+        if (seat == null) return null;
+        
+        // If already a number, keep as number
+        if (seat is int) return seat;
+        if (seat is num) return seat.toInt();
+        
+        // If string, try to parse as number
+        if (seat is String) {
+          final trimmed = seat.trim();
+          if (trimmed.isEmpty) return null;
+          
+          // Try parsing as number
+          final numValue = int.tryParse(trimmed);
+          if (numValue != null && trimmed == numValue.toString()) {
+            // It's a numeric string like "1", "2", "3" - convert to int
+            return numValue;
+          } else {
+            // Non-numeric string like "A1", "B2" - keep as string
+            return trimmed;
+          }
+        }
+        
+        // For other types, convert to string
+        final str = seat.toString().trim();
+        if (str.isEmpty) return null;
+        final numValue = int.tryParse(str);
+        if (numValue != null && str == numValue.toString()) {
+          return numValue;
+        }
+        return str;
+      }).where((seat) => seat != null).toList();
+
+      // Beta agents can book ANY seat - bypass all restrictions
+      // Check if counter has restricted access and validate selected seats (only for non-beta agents)
+      if (!_isBetaAgent && selectedBus.hasRestrictedAccess == true) {
+        // First, validate against allowedSeats
+        if (selectedBus.allowedSeats != null && selectedBus.allowedSeats!.isNotEmpty) {
+          // Find seats that are not in allowedSeats
+          // Check both numeric and string comparisons to handle type mismatches
+          final notAllowedSeats = normalizedSelectedSeats.where((seat) {
+            // Try multiple comparison methods to handle type mismatches
+            if (seat is int) {
+              // Check if seat number is in allowedSeats (as int or string)
+              return !selectedBus.allowedSeats!.contains(seat) &&
+                     !selectedBus.allowedSeats!.any((allowed) => 
+                       allowed is int ? allowed == seat : 
+                       allowed.toString() == seat.toString()
+                     );
+            }
+            // For string seats or mixed types, check string comparison
+            final seatStr = seat.toString();
+            return !selectedBus.allowedSeats!.any((allowed) {
+              // Try multiple comparison methods
+              if (allowed is int) {
+                return allowed.toString() == seatStr || allowed == int.tryParse(seatStr);
+              }
+              return allowed.toString() == seatStr;
+            });
+          }).toList();
+
+          if (notAllowedSeats.isNotEmpty) {
+            final allowedSeatsStr = selectedBus.allowedSeats!.map((s) => s.toString()).join(', ');
+            final notAllowedStr = notAllowedSeats.map((s) => s.toString()).join(', ');
+            ScaffoldMessenger.of(context).showSnackBar(
+              ErrorSnackBar(
+                message: 'You are not allowed to book seat(s): $notAllowedStr. You can only book: $allowedSeatsStr',
+              ),
+            );
+            return;
+          }
+        }
+
+        // Second, validate against availableAllowedSeats (seats that are BOTH allowed AND available)
+        if (selectedBus.availableAllowedSeats != null && selectedBus.availableAllowedSeats!.isNotEmpty) {
+          // Find seats that are not in availableAllowedSeats
+          // Check both numeric and string comparisons to handle type mismatches
+          final notAvailableSeats = normalizedSelectedSeats.where((seat) {
+            // Try multiple comparison methods to handle type mismatches
+            if (seat is int) {
+              // Check if seat number is in availableAllowedSeats (as int or string)
+              return !selectedBus.availableAllowedSeats!.contains(seat) &&
+                     !selectedBus.availableAllowedSeats!.any((allowed) => 
+                       allowed is int ? allowed == seat : 
+                       allowed.toString() == seat.toString()
+                     );
+            }
+            // For string seats or mixed types, check string comparison
+            final seatStr = seat.toString();
+            return !selectedBus.availableAllowedSeats!.any((allowed) {
+              // Try multiple comparison methods
+              if (allowed is int) {
+                return allowed.toString() == seatStr || allowed == int.tryParse(seatStr);
+              }
+              return allowed.toString() == seatStr;
+            });
+          }).toList();
+
+          if (notAvailableSeats.isNotEmpty) {
+            final availableSeatsStr = selectedBus.availableAllowedSeats!.map((s) => s.toString()).join(', ');
+            final notAvailableStr = notAvailableSeats.map((s) => s.toString()).join(', ');
+            ScaffoldMessenger.of(context).showSnackBar(
+              ErrorSnackBar(
+                message: 'Seat(s) $notAvailableStr are not currently available. Available seats: $availableSeatsStr',
+              ),
+            );
+            return;
+          }
+        } else if (selectedBus.allowedSeats != null && selectedBus.allowedSeats!.isNotEmpty) {
+          // If availableAllowedSeats is empty but allowedSeats exists, no seats are available
+          ScaffoldMessenger.of(context).showSnackBar(
+            ErrorSnackBar(
+              message: 'No seats are currently available for booking on this bus.',
+            ),
+          );
+          return;
+        }
+      }
     }
 
     context.read<BookingBloc>().add(
@@ -331,6 +539,8 @@ class _BusCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
       color: isSelected
@@ -365,37 +575,52 @@ class _BusCard extends StatelessWidget {
                   children: [
                     Text(
                       bus.name,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
+                            color: isSelected
+                                ? Colors.white
+                                : theme.textTheme.titleMedium?.color,
                           ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${bus.from} → ${bus.to}',
-                      style: Theme.of(context).textTheme.bodyMedium,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: isSelected
+                            ? Colors.white70
+                            : theme.textTheme.bodyMedium?.color,
+                      ),
                     ),
                     const SizedBox(height: 4),
                     Row(
                       children: [
-                        Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+                        Icon(
+                          Icons.access_time,
+                          size: 16,
+                          color: isSelected ? Colors.white70 : Colors.grey[600],
+                        ),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             '${bus.time}${bus.arrival != null ? ' - ${bus.arrival}' : ''}',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.grey[600],
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                  color: isSelected ? Colors.white70 : Colors.grey[600],
                                 ),
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Icon(Icons.event, size: 16, color: Colors.grey[600]),
+                        Icon(
+                          Icons.event,
+                          size: 16,
+                          color: isSelected ? Colors.white70 : Colors.grey[600],
+                        ),
                         const SizedBox(width: 4),
                         Flexible(
                           child: Text(
                             DateFormat('MMM d, y').format(bus.date),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.grey[600],
+                            style: theme.textTheme.bodySmall?.copyWith(
+                                  color: isSelected ? Colors.white70 : Colors.grey[600],
                                 ),
                             overflow: TextOverflow.ellipsis,
                           ),
@@ -410,9 +635,11 @@ class _BusCard extends StatelessWidget {
                 children: [
                   Text(
                     'Rs. ${NumberFormat('#,##0').format(bus.price)}',
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    style: theme.textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Theme.of(context).colorScheme.primary,
+                          color: isSelected
+                              ? Colors.white
+                              : theme.colorScheme.primary,
                         ),
                   ),
                   const SizedBox(height: 4),
@@ -450,10 +677,11 @@ class _BusCard extends StatelessWidget {
 
 class _SeatSelectionSection extends StatelessWidget {
   final BusInfoEntity bus;
-  final List<int> selectedSeats;
-  final Function(List<int>) onSeatsChanged;
-  final Function(List<int>) onLockSeats;
-  final Function(List<int>) onUnlockSeats;
+  final List<dynamic> selectedSeats; // Supports both int and String
+  final Function(List<dynamic>) onSeatsChanged;
+  final Function(List<dynamic>) onLockSeats;
+  final Function(List<dynamic>) onUnlockSeats;
+  final bool isBetaAgent;
 
   const _SeatSelectionSection({
     required this.bus,
@@ -461,181 +689,613 @@ class _SeatSelectionSection extends StatelessWidget {
     required this.onSeatsChanged,
     required this.onLockSeats,
     required this.onUnlockSeats,
+    required this.isBetaAgent,
   });
 
   @override
   Widget build(BuildContext context) {
-    final bookedSeats = bus.bookedSeats;
-    final lockedSeats = bus.lockedSeats.map((lock) => lock.seatNumber).toList();
+    // Extract booked seats - handle both int and String formats
+    final bookedSeats = bus.bookedSeats.map((seat) {
+      if (seat is num) return seat.toInt();
+      if (seat is String) return seat;
+      return seat.toString();
+    }).toList();
     
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Icon(Icons.event_seat, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Select Seats',
-                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            // Seat Map
-            _SeatMap(
-              totalSeats: bus.totalSeats,
-              bookedSeats: bookedSeats,
-              lockedSeats: lockedSeats,
-              selectedSeats: selectedSeats,
-              onSeatTapped: (seatNumber) {
-                final newSeats = List<int>.from(selectedSeats);
-                if (newSeats.contains(seatNumber)) {
-                  newSeats.remove(seatNumber);
-                } else {
-                  newSeats.add(seatNumber);
-                }
-                onSeatsChanged(newSeats);
-              },
-            ),
-            const SizedBox(height: 16),
-            // Legend
-            _SeatLegend(
-              onLockSeats: () {
-                if (selectedSeats.isNotEmpty) {
-                  onLockSeats(selectedSeats);
-                }
-              },
-              onUnlockSeats: () {
-                if (selectedSeats.isNotEmpty) {
-                  onUnlockSeats(selectedSeats);
-                }
-              },
-            ),
-            if (selectedSeats.isNotEmpty) ...[
-              const SizedBox(height: 16),
+    // Extract locked seats - handle SeatLockEntity objects
+    final lockedSeats = bus.lockedSeats.map((lock) {
+      final seatNum = lock.seatNumber;
+      if (seatNum is num) return seatNum.toInt();
+      if (seatNum is String) return seatNum;
+      return seatNum.toString();
+    }).toList();
+    
+    final seatConfiguration = bus.seatConfiguration;
+    final totalSeats = bus.totalSeats;
+    
+    // Debug: Print seat information
+    print('🔍 _SeatSelectionSection: Bus seat information');
+    print('   Total Seats: $totalSeats');
+    print('   Booked Seats: $bookedSeats (${bookedSeats.length})');
+    print('   Locked Seats: $lockedSeats (${lockedSeats.length})');
+    print('   Allowed Seats: ${bus.allowedSeats}');
+    print('   Allowed Seats Count: ${bus.allowedSeatsCount}');
+    print('   Has Restricted Access: ${bus.hasRestrictedAccess}');
+    print('   Has Full Access: ${bus.hasFullAccess}');
+    print('   Has No Access: ${bus.hasNoAccess}');
+    print('   Available Allowed Seats: ${bus.availableAllowedSeats}');
+    print('   Available Allowed Seats Count: ${bus.availableAllowedSeatsCount}');
+    print('   Seat Configuration: $seatConfiguration');
+    print('   Available Seats: ${totalSeats - bookedSeats.length - lockedSeats.length}');
+    
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
               Container(
-                padding: const EdgeInsets.all(12),
+                padding: const EdgeInsets.all(AppTheme.spacingS),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(8),
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        'Selected: ${selectedSeats.join(', ')} (${selectedSeats.length} seat${selectedSeats.length > 1 ? 's' : ''})',
-                        style: Theme.of(context).textTheme.bodyMedium,
-                      ),
-                    ),
-                  ],
+                child: Icon(
+                  Icons.event_seat_rounded,
+                  color: AppTheme.primaryColor,
+                  size: 24,
                 ),
               ),
+              const SizedBox(width: AppTheme.spacingS),
+              Text(
+                'Select Seats',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+              ),
             ],
+          ),
+          const SizedBox(height: AppTheme.spacingL),
+          // Show access status info based on backend flags
+          // Show restricted access warning only for non-beta agents
+          if (!isBetaAgent && bus.hasRestrictedAccess == true) ...[
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingS),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.orange.shade200),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                      const SizedBox(width: AppTheme.spacingS),
+                      Expanded(
+                        child: Text(
+                          'Restricted Access',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange.shade700,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  if (bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty)
+                    Text(
+                      'You can only book seats: ${bus.allowedSeats!.map((s) => s.toString()).join(', ')}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                  if (bus.availableAllowedSeats != null && bus.availableAllowedSeats!.isNotEmpty)
+                    Text(
+                      'Available allowed seats: ${bus.availableAllowedSeats!.map((s) => s.toString()).join(', ')}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.orange.shade700,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingM),
+          ] else if (bus.hasNoAccess == true) ...[
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingS),
+              decoration: BoxDecoration(
+                color: Colors.red.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.red.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.block, color: Colors.red.shade700, size: 20),
+                  const SizedBox(width: AppTheme.spacingS),
+                  Expanded(
+                    child: Text(
+                      'No Access: You do not have permission to book seats on this bus.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.red.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingM),
+          ] else if (bus.hasFullAccess == true) ...[
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingS),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.green.shade200),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                  const SizedBox(width: AppTheme.spacingS),
+                  Expanded(
+                    child: Text(
+                      'Full Access: You can book any available seat.',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.green.shade700,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingM),
           ],
-        ),
+          // Seat Map
+          _SeatMap(
+            bus: bus,
+            totalSeats: bus.totalSeats,
+            seatConfiguration: seatConfiguration,
+            bookedSeats: bookedSeats,
+            lockedSeats: lockedSeats,
+            selectedSeats: selectedSeats,
+            isBetaAgent: isBetaAgent,
+            onSeatTapped: (seatIdentifier) {
+              final newSeats = List<dynamic>.from(selectedSeats);
+              // Use proper comparison for both int and String
+              final index = newSeats.indexWhere((s) => 
+                s == seatIdentifier || 
+                s.toString() == seatIdentifier.toString()
+              );
+              if (index != -1) {
+                newSeats.removeAt(index);
+              } else {
+                newSeats.add(seatIdentifier);
+              }
+              onSeatsChanged(newSeats);
+            },
+          ),
+          const SizedBox(height: 16),
+          // Seat Status Summary
+          Container(
+            padding: const EdgeInsets.all(AppTheme.spacingS),
+            decoration: BoxDecoration(
+              color: Colors.blue.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: Colors.blue.shade200),
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _SeatStatusItem(
+                  icon: Icons.event_seat,
+                  color: Colors.green,
+                  label: bus.hasRestrictedAccess == true 
+                      ? 'Available Allowed' 
+                      : 'Available',
+                  count: bus.hasRestrictedAccess == true && bus.availableAllowedSeatsCount != null
+                      ? bus.availableAllowedSeatsCount!
+                      : (totalSeats - bookedSeats.length - lockedSeats.length),
+                ),
+                _SeatStatusItem(
+                  icon: Icons.event_busy,
+                  color: Colors.red,
+                  label: 'Booked',
+                  count: bookedSeats.length,
+                ),
+                _SeatStatusItem(
+                  icon: Icons.lock,
+                  color: Colors.orange,
+                  label: 'Locked',
+                  count: lockedSeats.length,
+                ),
+                if (bus.hasRestrictedAccess == true && bus.allowedSeatsCount != null)
+                  _SeatStatusItem(
+                    icon: Icons.check_circle,
+                    color: Colors.blue,
+                    label: 'Allowed',
+                    count: bus.allowedSeatsCount!,
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Legend
+          _SeatLegend(
+            hasRestrictedSeats: bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty,
+            onLockSeats: () {
+              if (selectedSeats.isNotEmpty) {
+                onLockSeats(selectedSeats);
+              }
+            },
+            onUnlockSeats: () {
+              if (selectedSeats.isNotEmpty) {
+                onUnlockSeats(selectedSeats);
+              }
+            },
+          ),
+          if (selectedSeats.isNotEmpty) ...[
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.primaryContainer,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.info_outline, color: Theme.of(context).colorScheme.primary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      'Selected: ${selectedSeats.map((s) => s.toString()).join(', ')} (${selectedSeats.length} seat${selectedSeats.length > 1 ? 's' : ''})',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ],
       ),
     );
   }
 }
 
 class _SeatMap extends StatelessWidget {
+  final BusInfoEntity bus; // Bus entity to check allowedSeats
   final int totalSeats;
-  final List<int> bookedSeats;
-  final List<int> lockedSeats;
-  final List<int> selectedSeats;
-  final Function(int) onSeatTapped;
+  final List<String>? seatConfiguration; // Custom seat identifiers (e.g., ["A1", "A4", "B6"])
+  final List<dynamic> bookedSeats; // Supports both int and String
+  final List<dynamic> lockedSeats; // Supports both int and String
+  final List<dynamic> selectedSeats; // Supports both int and String
+  final Function(dynamic) onSeatTapped; // Accepts both int and String
+  final bool isBetaAgent;
 
   const _SeatMap({
+    required this.bus,
     required this.totalSeats,
+    this.seatConfiguration,
     required this.bookedSeats,
     required this.lockedSeats,
     required this.selectedSeats,
     required this.onSeatTapped,
+    required this.isBetaAgent,
   });
 
   @override
   Widget build(BuildContext context) {
+    // Use seatConfiguration if available, otherwise use sequential numbering
+    List<dynamic> seatIdentifiers;
+    if (seatConfiguration != null && seatConfiguration!.isNotEmpty) {
+      seatIdentifiers = seatConfiguration!;
+    } else {
+      // Fallback to sequential numbering (1, 2, 3, ...)
+      seatIdentifiers = List.generate(totalSeats, (index) => index + 1);
+    }
+    
+    // Filter seats based on counter access permissions - only show allowed seats
+    // Note: We show all allowed seats (even if booked/locked) but disable selection
+    // Beta agents can see ALL seats - bypass restrictions
+    // This gives better UX - user can see what seats they have access to
+    if (!isBetaAgent && bus.hasRestrictedAccess == true) {
+      // Counter has restricted access - only show allowed seats
+      if (bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty) {
+        seatIdentifiers = seatIdentifiers.where((seatIdentifier) {
+          // Convert seatIdentifier to int for comparison
+          final seatNum = seatIdentifier is int 
+              ? seatIdentifier 
+              : (seatIdentifier is String && int.tryParse(seatIdentifier) != null)
+                  ? int.parse(seatIdentifier)
+                  : null;
+          if (seatNum != null) {
+            return bus.allowedSeats!.contains(seatNum);
+          }
+          // For string-based seat identifiers, check if it matches any allowed seat number
+          return bus.allowedSeats!.any((allowed) => 
+            allowed.toString() == seatIdentifier.toString()
+          );
+        }).toList();
+      } else {
+        // Restricted access but no allowed seats = no seats to show
+        seatIdentifiers = [];
+      }
+    } else if (bus.hasNoAccess == true || bus.hasAccess == false) {
+      // Counter has no access - show no seats
+      seatIdentifiers = [];
+    } else if (bus.hasFullAccess == true) {
+      // Counter has full access - show all seats (no filtering needed)
+      // seatIdentifiers remains unchanged
+    } else {
+      // Fallback: check allowedSeats if flag not available
+      if (bus.allowedSeats != null) {
+        if (bus.allowedSeats!.isEmpty) {
+          // Empty list = no access
+          seatIdentifiers = [];
+        } else {
+          // Filter to only show allowed seats
+          seatIdentifiers = seatIdentifiers.where((seatIdentifier) {
+            final seatNum = seatIdentifier is int 
+                ? seatIdentifier 
+                : (seatIdentifier is String && int.tryParse(seatIdentifier) != null)
+                    ? int.parse(seatIdentifier)
+                    : null;
+            if (seatNum != null) {
+              return bus.allowedSeats!.contains(seatNum);
+            }
+            return bus.allowedSeats!.any((allowed) => 
+              allowed.toString() == seatIdentifier.toString()
+            );
+          }).toList();
+        }
+      }
+    }
+    
     // Calculate seats per row (typically 2-2 pattern or 2-1 pattern)
     final seatsPerRow = 4; // 2 seats on each side
-    final rows = (totalSeats / seatsPerRow).ceil();
+    final rows = (seatIdentifiers.length / seatsPerRow).ceil();
+    
+    // Helper to normalize seat IDs for comparison (handles int, String, num)
+    // Converts everything to a consistent string format for comparison
+    String normalizeSeatId(dynamic seatId) {
+      if (seatId == null) return '';
+      
+      // Handle num types (int, double)
+      if (seatId is num) {
+        // For integers, return as int string (e.g., "1" not "1.0")
+        if (seatId is int) return seatId.toString();
+        // For doubles, check if it's a whole number
+        if (seatId == seatId.roundToDouble()) {
+          return seatId.toInt().toString();
+        }
+        return seatId.toString();
+      }
+      
+      // Handle String types
+      if (seatId is String) {
+        // Try to parse as int to normalize (e.g., "1" vs 1)
+        final parsed = int.tryParse(seatId.trim());
+        if (parsed != null) return parsed.toString();
+        // Return trimmed uppercase for case-insensitive comparison
+        return seatId.trim().toUpperCase();
+      }
+      
+      // Fallback: convert to string
+      return seatId.toString().trim();
+    }
+    
+    // Helper function to check if a seat is booked/locked/selected
+    // Handles both int and String seat identifiers
+    bool isSeatInList(dynamic seatId, List<dynamic> list) {
+      if (list.isEmpty) return false;
+      
+      // Normalize seatId for comparison
+      final normalizedSeatId = normalizeSeatId(seatId);
+      
+      return list.any((item) {
+        final normalizedItem = normalizeSeatId(item);
+        // Try multiple comparison methods
+        return normalizedSeatId == normalizedItem ||
+               normalizedSeatId.toString() == normalizedItem.toString() ||
+               normalizedSeatId.toString().toLowerCase() == normalizedItem.toString().toLowerCase();
+      });
+    }
 
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(AppTheme.spacingM),
       decoration: BoxDecoration(
-        color: Colors.grey[100],
-        borderRadius: BorderRadius.circular(12),
+        color: AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusM),
+        border: Border.all(color: Colors.grey.shade200),
       ),
       child: Column(
         children: [
           // Driver/Steering wheel indicator
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingS),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.airline_seat_recline_normal, size: 20, color: Colors.grey[600]),
-                const SizedBox(width: 8),
+                Icon(
+                  Icons.airline_seat_recline_normal_rounded,
+                  size: 20,
+                  color: AppTheme.textTertiary,
+                ),
+                const SizedBox(width: AppTheme.spacingS),
                 Text(
                   'Front',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  style: TextStyle(
+                    color: AppTheme.textTertiary,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
+          const SizedBox(height: AppTheme.spacingS),
           // Seat grid
-          ...List.generate(rows, (rowIndex) {
-            final startSeat = rowIndex * seatsPerRow + 1;
+          if (seatIdentifiers.isEmpty) ...[
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingL),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Center(
+                child: Column(
+                  children: [
+                    Icon(Icons.event_busy, size: 48, color: Colors.grey[400]),
+                    const SizedBox(height: AppTheme.spacingS),
+                    Text(
+                      'No seats available for booking.',
+                      style: TextStyle(
+                        color: Colors.grey[600],
+                        fontSize: 14,
+                      ),
+                    ),
+                    if (bus.hasNoAccess == true)
+                      Padding(
+                        padding: const EdgeInsets.only(top: AppTheme.spacingS),
+                        child: Text(
+                          'You do not have access to book seats on this bus.',
+                          style: TextStyle(
+                            color: Colors.grey[500],
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ] else ...[
+            ...List.generate(rows, (rowIndex) {
+            final startIndex = rowIndex * seatsPerRow;
             
             return Padding(
-              padding: const EdgeInsets.only(bottom: 8),
+              padding: const EdgeInsets.only(bottom: AppTheme.spacingS),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: List.generate(seatsPerRow, (colIndex) {
-                  final seatNumber = startSeat + colIndex;
-                  if (seatNumber > totalSeats) {
+                  final seatIndex = startIndex + colIndex;
+                  if (seatIndex >= seatIdentifiers.length) {
                     return const SizedBox(width: 50, height: 50);
                   }
                   
-                  final isBooked = bookedSeats.contains(seatNumber);
-                  final isLocked = lockedSeats.contains(seatNumber);
-                  final isSelected = selectedSeats.contains(seatNumber);
+                  final seatIdentifier = seatIdentifiers[seatIndex];
+                  final isBooked = isSeatInList(seatIdentifier, bookedSeats);
+                  final isLocked = isSeatInList(seatIdentifier, lockedSeats);
+                  final isSelected = isSeatInList(seatIdentifier, selectedSeats);
+                  
+                  // Debug first few seats to verify comparison
+                  if (seatIndex < 3) {
+                    print('🔍 Seat Map Debug - Seat $seatIndex:');
+                    print('   Seat Identifier: $seatIdentifier (type: ${seatIdentifier.runtimeType})');
+                    print('   Normalized: ${normalizeSeatId(seatIdentifier)}');
+                    print('   Is Booked: $isBooked');
+                    print('   Is Locked: $isLocked');
+                    print('   Booked Seats: $bookedSeats');
+                    print('   Locked Seats: $lockedSeats');
+                  }
+                  
+                  // Since we've already filtered seatIdentifiers to only include allowed seats,
+                  // all seats shown here are allowed. However, we need to check if they're available for selection.
+                  // Use availableAllowedSeats to determine if seat can be selected
+                  bool isSeatSelectable = true;
+                  
+                  // Check if seat is in availableAllowedSeats (seats that are BOTH allowed AND available)
+                  // Beta agents can select ANY seat (if not booked/locked)
+                  if (isBetaAgent) {
+                    isSeatSelectable = !isBooked && !isLocked;
+                  } else if (bus.hasRestrictedAccess == true && 
+                      bus.availableAllowedSeats != null && 
+                      bus.availableAllowedSeats!.isNotEmpty) {
+                    // Only seats in availableAllowedSeats can be selected
+                    final seatNum = seatIdentifier is int 
+                        ? seatIdentifier 
+                        : (seatIdentifier is String && int.tryParse(seatIdentifier) != null)
+                            ? int.parse(seatIdentifier)
+                            : null;
+                    if (seatNum != null) {
+                      isSeatSelectable = bus.availableAllowedSeats!.contains(seatNum);
+                    } else {
+                      isSeatSelectable = bus.availableAllowedSeats!.any((allowed) => 
+                        allowed.toString() == seatIdentifier.toString()
+                      );
+                    }
+                  } else if (bus.hasNoAccess == true) {
+                    isSeatSelectable = false;
+                  } else if (bus.hasFullAccess == true) {
+                    // Full access - seat is selectable if not booked/locked
+                    isSeatSelectable = !isBooked && !isLocked;
+                  } else {
+                    // Fallback: check if seat is allowed (for backward compatibility)
+                    bool isSeatAllowed = true;
+                    if (bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty) {
+                      final seatNum = seatIdentifier is int 
+                          ? seatIdentifier 
+                          : (seatIdentifier is String && int.tryParse(seatIdentifier) != null)
+                              ? int.parse(seatIdentifier)
+                              : null;
+                      if (seatNum != null) {
+                        isSeatAllowed = bus.allowedSeats!.contains(seatNum);
+                      } else {
+                        isSeatAllowed = bus.allowedSeats!.any((allowed) => 
+                          allowed.toString() == seatIdentifier.toString()
+                        );
+                      }
+                    }
+                    isSeatSelectable = isSeatAllowed && !isBooked && !isLocked;
+                  }
                   
                   return _SeatWidget(
-                    seatNumber: seatNumber,
+                    seatIdentifier: seatIdentifier,
                     isBooked: isBooked,
                     isLocked: isLocked,
                     isSelected: isSelected,
-                    onTap: isBooked || isLocked ? null : () => onSeatTapped(seatNumber),
+                    isNotAllowed: !isSeatSelectable, // Disable if not selectable
+                    onTap: (isBooked || isLocked || !isSeatSelectable)
+                        ? null 
+                        : () => onSeatTapped(seatIdentifier),
                   );
                 }),
               ),
             );
           }),
+          ],
           // Back indicator
-          const SizedBox(height: 8),
+          if (seatIdentifiers.isNotEmpty) ...[
+          const SizedBox(height: AppTheme.spacingS),
           Container(
-            padding: const EdgeInsets.symmetric(vertical: 8),
+            padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingS),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(Icons.airline_seat_recline_normal, size: 20, color: Colors.grey[600]),
-                const SizedBox(width: 8),
+                Icon(
+                  Icons.airline_seat_recline_normal_rounded,
+                  size: 20,
+                  color: AppTheme.textTertiary,
+                ),
+                const SizedBox(width: AppTheme.spacingS),
                 Text(
                   'Back',
-                  style: TextStyle(color: Colors.grey[600], fontSize: 12),
+                  style: TextStyle(
+                    color: AppTheme.textTertiary,
+                    fontSize: 12,
+                  ),
                 ),
               ],
             ),
           ),
+          ],
         ],
       ),
     );
@@ -643,17 +1303,19 @@ class _SeatMap extends StatelessWidget {
 }
 
 class _SeatWidget extends StatelessWidget {
-  final int seatNumber;
+  final dynamic seatIdentifier; // Supports both int and String
   final bool isBooked;
   final bool isLocked;
   final bool isSelected;
+  final bool isNotAllowed; // Seat not in allowedSeats list
   final VoidCallback? onTap;
 
   const _SeatWidget({
-    required this.seatNumber,
+    required this.seatIdentifier,
     required this.isBooked,
     required this.isLocked,
     required this.isSelected,
+    this.isNotAllowed = false,
     this.onTap,
   });
 
@@ -662,50 +1324,96 @@ class _SeatWidget extends StatelessWidget {
     Color backgroundColor;
     Color textColor;
     IconData? icon;
+    String statusText = '';
 
+    // Determine seat status and styling
     if (isBooked) {
-      backgroundColor = Colors.red[300]!;
+      backgroundColor = Colors.red[400]!;
       textColor = Colors.white;
+      icon = Icons.event_busy;
+      statusText = 'Booked';
+    } else if (isNotAllowed) {
+      backgroundColor = Colors.grey[400]!;
+      textColor = Colors.grey[800]!;
       icon = Icons.block;
+      statusText = 'Blocked';
     } else if (isLocked) {
-      backgroundColor = Colors.orange[300]!;
+      backgroundColor = Colors.orange[400]!;
       textColor = Colors.white;
       icon = Icons.lock;
+      statusText = 'Locked';
     } else if (isSelected) {
       backgroundColor = Theme.of(context).colorScheme.primary;
       textColor = Colors.white;
-      icon = Icons.check;
+      icon = Icons.check_circle;
+      statusText = 'Selected';
     } else {
-      backgroundColor = Colors.white;
-      textColor = Colors.black87;
+      backgroundColor = Colors.green[50]!;
+      textColor = Colors.green[900]!;
+      statusText = 'Available';
     }
 
-    return InkWell(
-      onTap: onTap,
-      borderRadius: BorderRadius.circular(8),
-      child: Container(
-        width: 50,
-        height: 50,
-        decoration: BoxDecoration(
-          color: backgroundColor,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(
-            color: isSelected
-                ? Theme.of(context).colorScheme.primary
-                : Colors.grey[300]!,
-            width: isSelected ? 2 : 1,
+    return Tooltip(
+      message: '$statusText - Seat ${seatIdentifier.toString()}',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          width: 50,
+          height: 50,
+          decoration: BoxDecoration(
+            color: backgroundColor,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected
+                  ? Theme.of(context).colorScheme.primary
+                  : (isBooked || isLocked || isNotAllowed)
+                      ? backgroundColor
+                      : Colors.grey[300]!,
+              width: isSelected ? 2.5 : (isBooked || isLocked || isNotAllowed) ? 2 : 1,
+            ),
+            boxShadow: (isBooked || isLocked || isSelected)
+                ? [
+                    BoxShadow(
+                      color: backgroundColor.withOpacity(0.3),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
           ),
-        ),
-        child: Center(
-          child: icon != null
-              ? Icon(icon, color: textColor, size: 20)
-              : Text(
-                  seatNumber.toString(),
-                  style: TextStyle(
-                    color: textColor,
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              // Seat number/text
+              Text(
+                seatIdentifier.toString(),
+                style: TextStyle(
+                  color: textColor,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 11,
+                ),
+              ),
+              // Status icon overlay (top-right corner)
+              if (icon != null && (isBooked || isLocked || isNotAllowed || isSelected))
+                Positioned(
+                  top: 2,
+                  right: 2,
+                  child: Container(
+                    padding: const EdgeInsets.all(2),
+                    decoration: BoxDecoration(
+                      color: backgroundColor,
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      icon,
+                      color: textColor,
+                      size: 12,
+                    ),
                   ),
                 ),
+            ],
+          ),
         ),
       ),
     );
@@ -713,18 +1421,22 @@ class _SeatWidget extends StatelessWidget {
 }
 
 class _SeatLegend extends StatelessWidget {
+  final bool hasRestrictedSeats;
   final VoidCallback onLockSeats;
   final VoidCallback onUnlockSeats;
 
   const _SeatLegend({
+    this.hasRestrictedSeats = false,
     required this.onLockSeats,
     required this.onUnlockSeats,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return Wrap(
+      alignment: WrapAlignment.center,
+      spacing: AppTheme.spacingM,
+      runSpacing: AppTheme.spacingS,
       children: [
         _LegendItem(
           color: Colors.white,
@@ -740,6 +1452,12 @@ class _SeatLegend extends StatelessWidget {
           label: 'Locked',
           icon: Icons.lock,
         ),
+        if (hasRestrictedSeats)
+          _LegendItem(
+            color: Colors.grey[300]!,
+            label: 'Not Allowed',
+            icon: Icons.block,
+          ),
         _LegendItem(
           color: Theme.of(context).colorScheme.primary,
           label: 'Selected',
@@ -781,6 +1499,46 @@ class _LegendItem extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+class _SeatStatusItem extends StatelessWidget {
+  final IconData icon;
+  final Color color;
+  final String label;
+  final int count;
+
+  const _SeatStatusItem({
+    required this.icon,
+    required this.color,
+    required this.label,
+    required this.count,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: color, size: 20),
+        const SizedBox(height: 4),
+        Text(
+          count.toString(),
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: color,
+          ),
+        ),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 10,
+            color: Colors.grey[600],
+          ),
         ),
       ],
     );
@@ -1117,7 +1875,7 @@ class _PaymentMethodOption extends StatelessWidget {
 
 class _BookingSummarySection extends StatelessWidget {
   final BusInfoEntity bus;
-  final List<int> selectedSeats;
+  final List<dynamic> selectedSeats; // Supports both int (legacy) and String (new format)
   final String paymentMethod;
 
   const _BookingSummarySection({
@@ -1223,7 +1981,7 @@ class _SummaryRow extends StatelessWidget {
 
 class _SelectedBusAndSeatsSummary extends StatelessWidget {
   final BusInfoEntity bus;
-  final List<int> selectedSeats;
+  final List<dynamic> selectedSeats; // Supports both int (legacy) and String (new format)
 
   const _SelectedBusAndSeatsSummary({
     required this.bus,

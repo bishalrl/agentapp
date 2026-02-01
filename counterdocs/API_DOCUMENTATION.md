@@ -2,7 +2,7 @@
 
 ## Base URL
 ```
-Production: https://api.neelosewa.com/api
+Production: http://147.93.152.80:5000/api
 Development: http://localhost:5000/api
 ```
 

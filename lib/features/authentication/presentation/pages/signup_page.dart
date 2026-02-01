@@ -32,8 +32,10 @@ class _SignupPageView extends StatefulWidget {
 
 class _SignupPageViewState extends State<_SignupPageView> {
   final formKey = GlobalKey<FormState>();
+  String registrationType = 'counter'; // 'counter' or 'betaAgent'
   final agencyNameController = TextEditingController();
   final ownerNameController = TextEditingController();
+  final nameController = TextEditingController(); // Required for Beta Agent
   final addressController = TextEditingController();
   final districtProvinceController = TextEditingController();
   final primaryContactController = TextEditingController();
@@ -50,6 +52,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
   
   File? citizenshipFile;
   File? photoFile;
+  File? nameMatchImage; // Optional for Beta Agent
   File? panFile;
   File? registrationFile;
   bool hasDeviceAccess = false;
@@ -60,6 +63,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
   void dispose() {
     agencyNameController.dispose();
     ownerNameController.dispose();
+    nameController.dispose();
     addressController.dispose();
     districtProvinceController.dispose();
     primaryContactController.dispose();
@@ -197,6 +201,154 @@ class _SignupPageViewState extends State<_SignupPageView> {
                   ),
                   const SizedBox(height: 24),
                   
+                  // Registration Type Toggle
+                  _buildSectionCard(
+                    context,
+                    'Registration Type',
+                    Icons.category,
+                    [
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.grey[100],
+                          borderRadius: BorderRadius.circular(16),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    registrationType = 'counter';
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: registrationType == 'counter'
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.business_center,
+                                        color: registrationType == 'counter'
+                                            ? Colors.white
+                                            : Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Be Counter',
+                                        style: TextStyle(
+                                          color: registrationType == 'counter'
+                                              ? Colors.white
+                                              : Colors.grey[600],
+                                          fontWeight: registrationType == 'counter'
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                            Expanded(
+                              child: InkWell(
+                                onTap: () {
+                                  setState(() {
+                                    registrationType = 'betaAgent';
+                                  });
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(vertical: 16),
+                                  decoration: BoxDecoration(
+                                    color: registrationType == 'betaAgent'
+                                        ? Theme.of(context).colorScheme.primary
+                                        : Colors.transparent,
+                                    borderRadius: BorderRadius.circular(16),
+                                  ),
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.person_outline,
+                                        color: registrationType == 'betaAgent'
+                                            ? Colors.white
+                                            : Colors.grey[600],
+                                      ),
+                                      const SizedBox(width: 8),
+                                      Text(
+                                        'Beta Agent',
+                                        style: TextStyle(
+                                          color: registrationType == 'betaAgent'
+                                              ? Colors.white
+                                              : Colors.grey[600],
+                                          fontWeight: registrationType == 'betaAgent'
+                                              ? FontWeight.bold
+                                              : FontWeight.normal,
+                                          fontSize: 16,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: registrationType == 'betaAgent'
+                              ? Colors.blue[50]
+                              : Colors.orange[50],
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: registrationType == 'betaAgent'
+                                ? Colors.blue[200]!
+                                : Colors.orange[200]!,
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              registrationType == 'betaAgent'
+                                  ? Icons.info_outline
+                                  : Icons.business_center,
+                              color: registrationType == 'betaAgent'
+                                  ? Colors.blue[700]
+                                  : Colors.orange[700],
+                              size: 20,
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                registrationType == 'betaAgent'
+                                    ? 'Beta Agent: Full access to all buses and seats. Can book any seat on any bus as a service provider.'
+                                    : 'Counter: Regular counter that needs bus access approval. Can only book approved seats.',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: registrationType == 'betaAgent'
+                                      ? Colors.blue[900]
+                                      : Colors.orange[900],
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  
+                  const SizedBox(height: 16),
+                  
                   // Business Information
                   _buildSectionCard(
                     context,
@@ -216,6 +368,16 @@ class _SignupPageViewState extends State<_SignupPageView> {
                         icon: Icons.person,
                         validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                       ),
+                      // Name field - Required for Beta Agent
+                      if (registrationType == 'betaAgent') ...[
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: nameController,
+                          label: 'Name (to match documents) *',
+                          icon: Icons.badge,
+                          validator: (v) => v?.isEmpty ?? true ? 'Required for Beta Agent' : null,
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       _buildTextField(
                         controller: addressController,
@@ -268,120 +430,138 @@ class _SignupPageViewState extends State<_SignupPageView> {
                     ],
                   ),
                   
-                  const SizedBox(height: 16),
-                  
-                  // Office Details
-                  _buildSectionCard(
-                    context,
-                    'Office Details',
-                    Icons.business_center,
-                    [
-                      _buildTextField(
-                        controller: officeLocationController,
-                        label: 'Office Location *',
-                        icon: Icons.location_city,
-                        validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                      ),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: _buildTextField(
-                              controller: officeOpenTimeController,
-                              label: 'Open Time *',
-                              icon: Icons.access_time,
-                              hintText: '09:00',
-                              validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: _buildTextField(
-                              controller: officeCloseTimeController,
-                              label: 'Close Time *',
-                              icon: Icons.access_time,
-                              hintText: '18:00',
-                              validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: numberOfEmployeesController,
-                        label: 'Number of Employees *',
-                        icon: Icons.people,
-                        keyboardType: TextInputType.number,
-                        validator: (v) {
-                          if (v == null || v.isEmpty) return 'Required';
-                          if (int.tryParse(v) == null) return 'Enter a valid number';
-                          return null;
-                        },
-                      ),
-                      const SizedBox(height: 12),
-                      _buildTextField(
-                        controller: panVatNumberController,
-                        label: 'PAN/VAT Number (Optional)',
-                        icon: Icons.badge,
-                      ),
-                    ],
-                  ),
-                  
-                  const SizedBox(height: 16),
-                  
-                  // Access & Preferences
-                  _buildSectionCard(
-                    context,
-                    'Access & Preferences',
-                    Icons.settings,
-                    [
-                      SwitchListTile(
-                        title: const Text('Has Device Access'),
-                        subtitle: const Text('Do you have device access?'),
-                        value: hasDeviceAccess,
-                        onChanged: (value) {
-                          setState(() {
-                            hasDeviceAccess = value;
-                          });
-                        },
-                      ),
-                      SwitchListTile(
-                        title: const Text('Has Internet Access'),
-                        subtitle: const Text('Do you have internet access?'),
-                        value: hasInternetAccess,
-                        onChanged: (value) {
-                          setState(() {
-                            hasInternetAccess = value;
-                          });
-                        },
-                      ),
-                      const SizedBox(height: 8),
-                      DropdownButtonFormField<String>(
-                        value: preferredBookingMethod,
-                        decoration: InputDecoration(
-                          labelText: 'Preferred Booking Method *',
-                          prefixIcon: const Icon(Icons.book_online),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                          filled: true,
-                          fillColor: Colors.white,
+                  // Office Details - Only for Counter
+                  if (registrationType == 'counter') ...[
+                    const SizedBox(height: 16),
+                    _buildSectionCard(
+                      context,
+                      'Office Details',
+                      Icons.business_center,
+                      [
+                        _buildTextField(
+                          controller: officeLocationController,
+                          label: 'Office Location *',
+                          icon: Icons.location_city,
+                          validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
                         ),
-                        items: const [
-                          DropdownMenuItem(value: 'online', child: Text('Online')),
-                          DropdownMenuItem(value: 'offline', child: Text('Offline')),
-                          DropdownMenuItem(value: 'both', child: Text('Both')),
-                        ],
-                        onChanged: (value) {
-                          if (value != null) {
+                        const SizedBox(height: 12),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: _buildTextField(
+                                controller: officeOpenTimeController,
+                                label: 'Open Time *',
+                                icon: Icons.access_time,
+                                hintText: '09:00',
+                                validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: _buildTextField(
+                                controller: officeCloseTimeController,
+                                label: 'Close Time *',
+                                icon: Icons.access_time,
+                                hintText: '18:00',
+                                validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: numberOfEmployeesController,
+                          label: 'Number of Employees *',
+                          icon: Icons.people,
+                          keyboardType: TextInputType.number,
+                          validator: (v) {
+                            if (v == null || v.isEmpty) return 'Required';
+                            if (int.tryParse(v) == null) return 'Enter a valid number';
+                            return null;
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        _buildTextField(
+                          controller: panVatNumberController,
+                          label: 'PAN/VAT Number (Optional)',
+                          icon: Icons.badge,
+                        ),
+                      ],
+                    ),
+                    
+                    const SizedBox(height: 16),
+                    
+                    // Access & Preferences - Only for Counter
+                    _buildSectionCard(
+                      context,
+                      'Access & Preferences',
+                      Icons.settings,
+                      [
+                        SwitchListTile(
+                          title: const Text('Has Device Access'),
+                          subtitle: const Text('Do you have device access?'),
+                          value: hasDeviceAccess,
+                          onChanged: (value) {
                             setState(() {
-                              preferredBookingMethod = value;
+                              hasDeviceAccess = value;
                             });
-                          }
-                        },
-                      ),
-                    ],
-                  ),
+                          },
+                        ),
+                        SwitchListTile(
+                          title: const Text('Has Internet Access'),
+                          subtitle: const Text('Do you have internet access?'),
+                          value: hasInternetAccess,
+                          onChanged: (value) {
+                            setState(() {
+                              hasInternetAccess = value;
+                            });
+                          },
+                        ),
+                        const SizedBox(height: 8),
+                        DropdownButtonFormField<String>(
+                          value: preferredBookingMethod,
+                          decoration: InputDecoration(
+                            labelText: 'Preferred Booking Method *',
+                            prefixIcon: const Icon(Icons.book_online),
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            filled: true,
+                            fillColor: Colors.white,
+                          ),
+                          items: const [
+                            DropdownMenuItem(value: 'online', child: Text('Online')),
+                            DropdownMenuItem(value: 'offline', child: Text('Offline')),
+                            DropdownMenuItem(value: 'both', child: Text('Both')),
+                          ],
+                          onChanged: (value) {
+                            if (value != null) {
+                              setState(() {
+                                preferredBookingMethod = value;
+                              });
+                            }
+                          },
+                        ),
+                      ],
+                    ),
+                  ],
+                  
+                  // PAN/VAT Number for Beta Agent (optional)
+                  if (registrationType == 'betaAgent') ...[
+                    const SizedBox(height: 16),
+                    _buildSectionCard(
+                      context,
+                      'Additional Information',
+                      Icons.info,
+                      [
+                        _buildTextField(
+                          controller: panVatNumberController,
+                          label: 'PAN/VAT Number (Optional)',
+                          icon: Icons.badge,
+                        ),
+                      ],
+                    ),
+                  ],
                   
                   const SizedBox(height: 16),
                   
@@ -404,7 +584,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
                       ),
                       const SizedBox(height: 12),
                       _FilePickerField(
-                        label: 'Passport Photo *',
+                        label: 'Photo/Image (to match name) *',
                         icon: Icons.photo_camera,
                         selectedFile: photoFile,
                         isImage: true,
@@ -415,6 +595,22 @@ class _SignupPageViewState extends State<_SignupPageView> {
                           });
                         },
                       ),
+                      // Name Match Image - Optional for Beta Agent
+                      if (registrationType == 'betaAgent') ...[
+                        const SizedBox(height: 12),
+                        _FilePickerField(
+                          label: 'Name Match Image (Optional)',
+                          icon: Icons.verified_user,
+                          selectedFile: nameMatchImage,
+                          isImage: true,
+                          onFileSelected: (file) {
+                            setState(() {
+                              nameMatchImage = file;
+                              print('📷 Name match image selected: ${file?.path}');
+                            });
+                          },
+                        ),
+                      ],
                       const SizedBox(height: 12),
                       _FilePickerField(
                         label: 'PAN Document (Optional)',
@@ -516,6 +712,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
                                 }
 
                                 print('📤 Dispatching SignupRequestEvent');
+                                print('   Type: $registrationType');
                                 print('   Agency: ${agencyNameController.text}');
                                 print('   Email: ${emailController.text}');
                                 print('   Citizenship: ${citizenshipFile?.path}');
@@ -523,22 +720,41 @@ class _SignupPageViewState extends State<_SignupPageView> {
 
                                 context.read<SignupBloc>().safeAdd(
                                       SignupRequestEvent(
+                                        type: registrationType,
                                         agencyName: agencyNameController.text.trim(),
                                         ownerName: ownerNameController.text.trim(),
+                                        name: registrationType == 'betaAgent'
+                                            ? nameController.text.trim()
+                                            : null,
                                         address: addressController.text.trim(),
                                         districtProvince: districtProvinceController.text.trim(),
                                         primaryContact: primaryContactController.text.trim(),
                                         email: emailController.text.trim(),
-                                        officeLocation: officeLocationController.text.trim(),
-                                        officeOpenTime: officeOpenTimeController.text.trim(),
-                                        officeCloseTime: officeCloseTimeController.text.trim(),
-                                        numberOfEmployees: int.parse(numberOfEmployeesController.text),
-                                        hasDeviceAccess: hasDeviceAccess,
-                                        hasInternetAccess: hasInternetAccess,
-                                        preferredBookingMethod: preferredBookingMethod,
+                                        officeLocation: registrationType == 'counter'
+                                            ? officeLocationController.text.trim()
+                                            : null,
+                                        officeOpenTime: registrationType == 'counter'
+                                            ? officeOpenTimeController.text.trim()
+                                            : null,
+                                        officeCloseTime: registrationType == 'counter'
+                                            ? officeCloseTimeController.text.trim()
+                                            : null,
+                                        numberOfEmployees: registrationType == 'counter'
+                                            ? int.parse(numberOfEmployeesController.text)
+                                            : null,
+                                        hasDeviceAccess: registrationType == 'counter'
+                                            ? hasDeviceAccess
+                                            : null,
+                                        hasInternetAccess: registrationType == 'counter'
+                                            ? hasInternetAccess
+                                            : null,
+                                        preferredBookingMethod: registrationType == 'counter'
+                                            ? preferredBookingMethod
+                                            : null,
                                         password: passwordController.text,
                                         citizenshipFile: citizenshipFile!,
                                         photoFile: photoFile!,
+                                        nameMatchImage: nameMatchImage,
                                         panVatNumber: panVatNumberController.text.isEmpty
                                             ? null
                                             : panVatNumberController.text.trim(),

@@ -5,6 +5,7 @@ class BusState extends BaseBlocState {
   final List<BusEntity> buses;
   final BusEntity? createdBus;
   final BusEntity? updatedBus;
+  final BusEntity? searchedBus;
   final bool isLoading;
   final String? errorMessage;
   final String? successMessage;
@@ -13,6 +14,7 @@ class BusState extends BaseBlocState {
     this.buses = const [],
     this.createdBus,
     this.updatedBus,
+    this.searchedBus,
     this.isLoading = false,
     this.errorMessage,
     this.successMessage,
@@ -22,6 +24,7 @@ class BusState extends BaseBlocState {
     List<BusEntity>? buses,
     BusEntity? createdBus,
     BusEntity? updatedBus,
+    BusEntity? searchedBus,
     bool? isLoading,
     String? errorMessage,
     String? successMessage,
@@ -30,6 +33,7 @@ class BusState extends BaseBlocState {
       buses: buses ?? this.buses,
       createdBus: createdBus ?? this.createdBus,
       updatedBus: updatedBus ?? this.updatedBus,
+      searchedBus: searchedBus,
       isLoading: isLoading ?? this.isLoading,
       errorMessage: errorMessage,
       successMessage: successMessage,
@@ -37,6 +41,6 @@ class BusState extends BaseBlocState {
   }
 
   @override
-  List<Object?> get props => [buses, createdBus, updatedBus, isLoading, errorMessage, successMessage];
+  List<Object?> get props => [buses, createdBus, updatedBus, searchedBus, isLoading, errorMessage, successMessage];
 }
 

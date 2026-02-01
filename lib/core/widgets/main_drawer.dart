@@ -59,6 +59,22 @@ class MainDrawer extends StatelessWidget {
             },
           ),
           _DrawerTile(
+            icon: Icons.request_quote,
+            title: 'Request Bus Access',
+            onTap: () {
+              context.go('/counter/request-bus-access');
+              context.pop();
+            },
+          ),
+          _DrawerTile(
+            icon: Icons.list_alt,
+            title: 'My Requests',
+            onTap: () {
+              context.go('/counter/requests');
+              context.pop();
+            },
+          ),
+          _DrawerTile(
             icon: Icons.route,
             title: 'Routes',
             onTap: () {

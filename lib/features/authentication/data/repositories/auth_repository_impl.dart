@@ -21,22 +21,25 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Result<AuthEntity>> signup({
+    required String type,
     required String agencyName,
     required String ownerName,
+    String? name,
     required String address,
     required String districtProvince,
     required String primaryContact,
     required String email,
-    required String officeLocation,
-    required String officeOpenTime,
-    required String officeCloseTime,
-    required int numberOfEmployees,
-    required bool hasDeviceAccess,
-    required bool hasInternetAccess,
-    required String preferredBookingMethod,
+    String? officeLocation,
+    String? officeOpenTime,
+    String? officeCloseTime,
+    int? numberOfEmployees,
+    bool? hasDeviceAccess,
+    bool? hasInternetAccess,
+    String? preferredBookingMethod,
     required String password,
     required File citizenshipFile,
     required File photoFile,
+    File? nameMatchImage,
     String? panVatNumber,
     String? alternateContact,
     String? whatsappViber,
@@ -49,8 +52,10 @@ class AuthRepositoryImpl implements AuthRepository {
           print('📦 AuthRepositoryImpl.signup: Calling remoteDataSource');
           // Signup returns model with empty token - account needs admin verification
           final auth = await remoteDataSource.signup(
+            type: type,
             agencyName: agencyName,
             ownerName: ownerName,
+            name: name,
             address: address,
             districtProvince: districtProvince,
             primaryContact: primaryContact,
@@ -65,6 +70,7 @@ class AuthRepositoryImpl implements AuthRepository {
             password: password,
             citizenshipFile: citizenshipFile,
             photoFile: photoFile,
+            nameMatchImage: nameMatchImage,
             panVatNumber: panVatNumber,
             alternateContact: alternateContact,
             whatsappViber: whatsappViber,
@@ -99,10 +105,11 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Result<AuthEntity>> login(String email, String password) async {
+  Future<Result<AuthEntity>> login(String email, String password, {String loginType = 'counter'}) async {
     try {
       print('📦 AuthRepositoryImpl.login: Starting login process');
       print('   Email: $email');
+      print('   LoginType: $loginType');
       if (await networkInfo.isConnected) {
         print('   ✅ Network connected, calling remoteDataSource');
         try {
@@ -110,7 +117,9 @@ class AuthRepositoryImpl implements AuthRepository {
           print('   ✅ AuthRepositoryImpl.login: Remote login successful');
           print('   Token length: ${auth.token.length}');
           await localDataSource.saveToken(auth.token);
-          print('   ✅ Token saved to local storage');
+          // Save the session type based on loginType parameter
+          await localDataSource.saveSessionType(loginType);
+          print('   ✅ Token & session type ($loginType) saved to local storage');
           return Success(auth);
         } on NetworkException catch (e) {
           print('   ❌ AuthRepositoryImpl.login: NetworkException');
@@ -218,6 +227,7 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Result<void>> logout() async {
     try {
       await localDataSource.clearToken();
+      await localDataSource.clearSessionType();
       return const Success(null);
     } on CacheException catch (e) {
       return Error(CacheFailure(e.message));
@@ -254,6 +264,42 @@ class AuthRepositoryImpl implements AuthRepository {
   Future<Result<void>> clearToken() async {
     try {
       await localDataSource.clearToken();
+      return const Success(null);
+    } on CacheException catch (e) {
+      return Error(CacheFailure(e.message));
+    } catch (e) {
+      return Error(CacheFailure('Unexpected error: ${e.toString()}'));
+    }
+  }
+
+  @override
+  Future<Result<String?>> getStoredSessionType() async {
+    try {
+      final sessionType = await localDataSource.getSessionType();
+      return Success(sessionType);
+    } on CacheException catch (e) {
+      return Error(CacheFailure(e.message));
+    } catch (e) {
+      return Error(CacheFailure('Unexpected error: ${e.toString()}'));
+    }
+  }
+
+  @override
+  Future<Result<void>> saveSessionType(String type) async {
+    try {
+      await localDataSource.saveSessionType(type);
+      return const Success(null);
+    } on CacheException catch (e) {
+      return Error(CacheFailure(e.message));
+    } catch (e) {
+      return Error(CacheFailure('Unexpected error: ${e.toString()}'));
+    }
+  }
+
+  @override
+  Future<Result<void>> clearSessionType() async {
+    try {
+      await localDataSource.clearSessionType();
       return const Success(null);
     } on CacheException catch (e) {
       return Error(CacheFailure(e.message));

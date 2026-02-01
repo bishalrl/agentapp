@@ -14,18 +14,33 @@ class DriverModel extends DriverEntity {
     required super.assignedBusIds,
     required super.invitedBy,
     required super.invitedByType,
+    super.invitationCode,
+    super.invitationExpiresAt,
+    super.invitationSentAt,
+    super.password,
   });
 
   factory DriverModel.fromJson(Map<String, dynamic> json) {
+    // Helper function to parse DateTime safely
+    DateTime? parseDateTime(dynamic value) {
+      if (value == null) return null;
+      if (value is String) {
+        try {
+          return DateTime.parse(value);
+        } catch (e) {
+          return null;
+        }
+      }
+      return null;
+    }
+    
     return DriverModel(
       id: json['_id'] ?? json['id'] ?? '',
       name: json['name'] ?? '',
       phoneNumber: json['phoneNumber'] ?? '',
       email: json['email'],
       licenseNumber: json['licenseNumber'] ?? '',
-      licenseExpiry: json['licenseExpiry'] != null
-          ? DateTime.parse(json['licenseExpiry'])
-          : null,
+      licenseExpiry: parseDateTime(json['licenseExpiry']),
       address: json['address'],
       status: json['status'] ?? 'pending',
       assignedBusId: json['assignedBusId'],
@@ -34,6 +49,11 @@ class DriverModel extends DriverEntity {
           : [],
       invitedBy: json['invitedBy'] ?? '',
       invitedByType: json['invitedByType'] ?? 'BusAgent',
+      // Driver Invitation System Fields
+      invitationCode: json['invitationCode'] as String?,
+      invitationExpiresAt: parseDateTime(json['invitationExpiresAt']),
+      invitationSentAt: parseDateTime(json['invitationSentAt']),
+      password: json['password'] as String?, // Usually not returned in responses for security
     );
   }
 

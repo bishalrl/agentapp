@@ -10,7 +10,7 @@ abstract class BookingRepository {
   Future<Result<BusInfoEntity>> getBusDetails(String busId);
   Future<Result<BookingEntity>> createBooking({
     required String busId,
-    required List<int> seatNumbers,
+    required List<dynamic> seatNumbers, // Supports both int (legacy) and String (new format)
     required String passengerName,
     required String contactNumber,
     String? passengerEmail,
@@ -35,7 +35,7 @@ abstract class BookingRepository {
     required String bookingId,
     required String status,
   });
-  Future<Result<void>> lockSeats(String busId, List<int> seatNumbers);
-  Future<Result<void>> unlockSeats(String busId, List<int> seatNumbers);
+  Future<Result<void>> lockSeats(String busId, List<dynamic> seatNumbers); // Supports both int and String
+  Future<Result<void>> unlockSeats(String busId, List<dynamic> seatNumbers); // Supports both int and String
 }
 

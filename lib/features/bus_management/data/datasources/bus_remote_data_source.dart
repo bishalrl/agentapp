@@ -1,6 +1,9 @@
+import 'dart:convert';
+import 'dart:io';
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/network/multipart_client.dart';
 import '../models/bus_model.dart';
 
 abstract class BusRemoteDataSource {
@@ -12,12 +15,41 @@ abstract class BusRemoteDataSource {
     required DateTime date,
     required String time,
     String? arrival,
+    String? timeFormat, // '12h' or '24h' (default: '12h')
+    String? arrivalFormat, // '12h' or '24h' (default: '12h')
+    String? tripDirection, // 'going' or 'returning' (default: 'going')
     required double price,
     required int totalSeats,
     String? busType,
     String? driverContact,
+    String? driverEmail, // Driver email for invitation system
+    String? driverName, // Driver name (required if driverEmail provided)
+    String? driverLicenseNumber, // Driver license number (required if driverEmail provided)
+    String? driverId, // Existing driver ID
     double? commissionRate,
     List<int>? allowedSeats,
+    List<String>? seatConfiguration, // Custom seat identifiers (Nepal standard: A/B only, e.g., ["A1", "A4", "B6"])
+    List<String>? amenities, // Bus amenities (e.g., ["WiFi", "AC", "TV"])
+    List<Map<String, String>>? boardingPoints, // Boarding points with location and time
+    List<Map<String, String>>? droppingPoints, // Dropping points with location and time
+    String? routeId, // Route ID reference
+    String? scheduleId, // Schedule ID reference
+    double? distance, // Distance in kilometers
+    int? estimatedDuration, // Estimated duration in minutes
+    File? mainImage, // Main bus image file
+    List<File>? galleryImages, // Gallery image files
+    File? driverPhoto, // Driver photo file (optional)
+    File? driverLicensePhoto, // Driver license photo file (optional)
+    // Recurring Schedule Fields
+    bool? isRecurring, // Enable recurring schedule
+    List<int>? recurringDays, // Days of week [0=Sun, 6=Sat]
+    DateTime? recurringStartDate, // Recurring start date
+    DateTime? recurringEndDate, // Recurring end date
+    String? recurringFrequency, // 'daily' | 'weekly' | 'monthly'
+    // Auto-Activation Fields
+    bool? autoActivate, // Enable date-based auto activation
+    DateTime? activeFromDate, // Auto-activation start date
+    DateTime? activeToDate, // Auto-activation end date
     required String token,
   });
   
@@ -34,8 +66,22 @@ abstract class BusRemoteDataSource {
     int? totalSeats,
     String? busType,
     String? driverContact,
+    String? driverEmail, // Driver email for invitation system
+    String? driverName, // Driver name (required if driverEmail provided)
+    String? driverLicenseNumber, // Driver license number (required if driverEmail provided)
+    String? driverId, // Existing driver ID
     double? commissionRate,
     List<int>? allowedSeats,
+    List<String>? seatConfiguration, // Custom seat identifiers (e.g., ["A1", "A4", "B6"])
+    List<String>? amenities, // Bus amenities (e.g., ["WiFi", "AC", "TV"])
+    List<Map<String, String>>? boardingPoints, // Boarding points with location and time
+    List<Map<String, String>>? droppingPoints, // Dropping points with location and time
+    String? routeId, // Route ID reference
+    String? scheduleId, // Schedule ID reference
+    double? distance, // Distance in kilometers
+    int? estimatedDuration, // Estimated duration in minutes
+    File? mainImage, // Main bus image file
+    List<File>? galleryImages, // Gallery image files
     required String token,
   });
   
@@ -55,6 +101,11 @@ abstract class BusRemoteDataSource {
     required String token,
   });
 
+  Future<BusModel> searchBusByNumber({
+    required String busNumber,
+    required String token,
+  });
+
   Future<BusModel> getBusDetails(String busId, String token);
   Future<BusModel> getMyBusDetails(String busId, String token);
   
@@ -64,8 +115,9 @@ abstract class BusRemoteDataSource {
 
 class BusRemoteDataSourceImpl implements BusRemoteDataSource {
   final ApiClient apiClient;
+  final MultipartClient multipartClient;
 
-  BusRemoteDataSourceImpl(this.apiClient);
+  BusRemoteDataSourceImpl(this.apiClient, this.multipartClient);
 
   @override
   Future<BusModel> createBus({
@@ -76,41 +128,223 @@ class BusRemoteDataSourceImpl implements BusRemoteDataSource {
     required DateTime date,
     required String time,
     String? arrival,
+    String? timeFormat, // '12h' or '24h' (default: '12h')
+    String? arrivalFormat, // '12h' or '24h' (default: '12h')
+    String? tripDirection, // 'going' or 'returning' (default: 'going')
     required double price,
     required int totalSeats,
     String? busType,
     String? driverContact,
+    String? driverEmail, // Driver email for invitation system
+    String? driverName, // Driver name (required if driverEmail provided)
+    String? driverLicenseNumber, // Driver license number (required if driverEmail provided)
+    String? driverId, // Existing driver ID
     double? commissionRate,
     List<int>? allowedSeats,
+    List<String>? seatConfiguration, // Custom seat identifiers (Nepal standard: A/B only, e.g., ["A1", "A4", "B6"])
+    List<String>? amenities, // Bus amenities (e.g., ["WiFi", "AC", "TV"])
+    List<Map<String, String>>? boardingPoints, // Boarding points with location and time
+    List<Map<String, String>>? droppingPoints, // Dropping points with location and time
+    String? routeId, // Route ID reference
+    String? scheduleId, // Schedule ID reference
+    double? distance, // Distance in kilometers
+    int? estimatedDuration, // Estimated duration in minutes
+    File? mainImage, // Main bus image file
+    List<File>? galleryImages, // Gallery image files
+    File? driverPhoto, // Driver photo file (optional)
+    File? driverLicensePhoto, // Driver license photo file (optional)
+    // Recurring Schedule Fields
+    bool? isRecurring, // Enable recurring schedule
+    List<int>? recurringDays, // Days of week [0=Sun, 6=Sat]
+    DateTime? recurringStartDate, // Recurring start date
+    DateTime? recurringEndDate, // Recurring end date
+    String? recurringFrequency, // 'daily' | 'weekly' | 'monthly'
+    // Auto-Activation Fields
+    bool? autoActivate, // Enable date-based auto activation
+    DateTime? activeFromDate, // Auto-activation start date
+    DateTime? activeToDate, // Auto-activation end date
     required String token,
   }) async {
     try {
-      print('📤 BusRemoteDataSource.createBus: Sending request');
+      print('📤 BusRemoteDataSource.createBus: Sending multipart request');
       print('   Endpoint: ${ApiConstants.counterBusCreate}');
       print('   Name: $name, From: $from, To: $to, Date: $date');
+      print('   Time: $time, Arrival: $arrival');
+      print('   TimeFormat: $timeFormat, ArrivalFormat: $arrivalFormat');
+      print('   TripDirection: $tripDirection');
+      print('   SeatConfiguration: $seatConfiguration');
+      print('   DriverEmail: $driverEmail, DriverName: $driverName');
+      print('   IsRecurring: $isRecurring, AutoActivate: $autoActivate');
       
-      final body = {
+      // Prepare form fields (all as strings for multipart)
+      final fields = <String, String>{
         'name': name,
         'vehicleNumber': vehicleNumber,
         'from': from,
         'to': to,
         'date': date.toIso8601String().split('T')[0], // Format as YYYY-MM-DD
         'time': time,
-        'price': price,
-        'totalSeats': totalSeats,
-        if (arrival != null) 'arrival': arrival,
-        if (busType != null) 'busType': busType,
-        if (driverContact != null) 'driverContact': driverContact,
-        if (commissionRate != null) 'commissionRate': commissionRate,
-        if (allowedSeats != null && allowedSeats.isNotEmpty) 'allowedSeats': allowedSeats,
+        'price': price.toString(),
+        'totalSeats': totalSeats.toString(),
       };
       
-      final response = await apiClient.post(
-        ApiConstants.counterBusCreate,
-        headers: {
-          ApiConstants.authorizationHeader: '${ApiConstants.bearerPrefix}$token',
-        },
-        body: body,
+      // Required fields
+      if (arrival != null) fields['arrival'] = arrival;
+      if (busType != null) fields['busType'] = busType;
+      
+      // Time format fields
+      if (timeFormat != null && timeFormat.isNotEmpty) {
+        fields['timeFormat'] = timeFormat;
+        print('   ✅ Added timeFormat: $timeFormat');
+      }
+      if (arrivalFormat != null && arrivalFormat.isNotEmpty) {
+        fields['arrivalFormat'] = arrivalFormat;
+        print('   ✅ Added arrivalFormat: $arrivalFormat');
+      }
+      
+      // Trip direction
+      if (tripDirection != null && tripDirection.isNotEmpty) {
+        fields['tripDirection'] = tripDirection;
+        print('   ✅ Added tripDirection: $tripDirection');
+      }
+      
+      // Driver assignment (at least one required)
+      // Note: When driverEmail is provided, it triggers invitation system
+      // The driver will register later with invitation code, so licenseNumber is not required here
+      if (driverContact != null && driverContact.isNotEmpty) {
+        fields['driverContact'] = driverContact;
+        print('   ✅ Added driverContact to fields: $driverContact');
+      }
+      if (driverId != null && driverId.isNotEmpty) {
+        fields['driverId'] = driverId;
+        print('   ✅ Added driverId to fields: $driverId');
+      }
+      if (driverEmail != null && driverEmail.isNotEmpty) {
+        fields['driverEmail'] = driverEmail;
+        print('   ✅ Added driverEmail to fields: $driverEmail');
+        // driverName is required if driverEmail is provided
+        if (driverName != null && driverName.isNotEmpty) {
+          fields['driverName'] = driverName;
+          print('   ✅ Added driverName to fields: $driverName');
+        }
+        // licenseNumber is REQUIRED if driverEmail is provided (backend validation)
+        // Backend expects this field when driverEmail is provided
+        if (driverLicenseNumber != null && driverLicenseNumber.isNotEmpty) {
+          fields['licenseNumber'] = driverLicenseNumber.trim();
+          print('   ✅ Added licenseNumber to fields: ${fields['licenseNumber']}');
+        } else {
+          print('   ❌ ERROR: driverEmail provided but licenseNumber is missing or empty!');
+          print('   ⚠️ This will cause backend validation error');
+        }
+      }
+      
+      // Commission rate (required for admin, optional for counter)
+      if (commissionRate != null) {
+        fields['commissionRate'] = commissionRate.toString();
+        print('   ✅ Added commissionRate to fields: $commissionRate');
+      }
+      
+      // Seat configuration (optional - custom seat identifiers)
+      if (seatConfiguration != null && seatConfiguration.isNotEmpty) {
+        // Convert list to JSON string for multipart
+        fields['seatConfiguration'] = jsonEncode(seatConfiguration);
+        print('   ✅ Added seatConfiguration to fields: $seatConfiguration');
+        print('   ✅ seatConfiguration as JSON string: ${jsonEncode(seatConfiguration)}');
+      } else {
+        print('   ℹ️ seatConfiguration not provided - will use sequential numbering');
+      }
+      
+      // Allowed seats (optional)
+      if (allowedSeats != null && allowedSeats.isNotEmpty) {
+        // Convert list to JSON string for multipart
+        fields['allowedSeats'] = jsonEncode(allowedSeats);
+        print('   ✅ Added allowedSeats to fields: $allowedSeats');
+      }
+      
+      // Amenities (optional - can be array or comma-separated string)
+      if (amenities != null && amenities.isNotEmpty) {
+        // Send as comma-separated string for multipart (backend can parse both)
+        fields['amenities'] = amenities.join(',');
+        print('   ✅ Added amenities to fields: ${amenities.join(',')}');
+      }
+      
+      // Boarding points (optional - array of objects)
+      if (boardingPoints != null && boardingPoints.isNotEmpty) {
+        // Convert array of maps to JSON string for multipart
+        fields['boardingPoints'] = jsonEncode(boardingPoints);
+        print('   ✅ Added boardingPoints to fields: ${boardingPoints.length} points');
+      }
+      
+      // Dropping points (optional - array of objects)
+      if (droppingPoints != null && droppingPoints.isNotEmpty) {
+        // Convert array of maps to JSON string for multipart
+        fields['droppingPoints'] = jsonEncode(droppingPoints);
+        print('   ✅ Added droppingPoints to fields: ${droppingPoints.length} points');
+      }
+      
+      // Route and schedule references (optional)
+      if (routeId != null && routeId.isNotEmpty) {
+        fields['routeId'] = routeId;
+        print('   ✅ Added routeId to fields: $routeId');
+      }
+      if (scheduleId != null && scheduleId.isNotEmpty) {
+        fields['scheduleId'] = scheduleId;
+        print('   ✅ Added scheduleId to fields: $scheduleId');
+      }
+      
+      // Distance and duration (optional)
+      if (distance != null) {
+        fields['distance'] = distance.toString();
+        print('   ✅ Added distance to fields: $distance km');
+      }
+      if (estimatedDuration != null) {
+        fields['estimatedDuration'] = estimatedDuration.toString();
+        print('   ✅ Added estimatedDuration to fields: $estimatedDuration minutes');
+      }
+      
+      print('   📋 Final fields keys: ${fields.keys.toList()}');
+      print('   📋 Final fields seatConfiguration: ${fields['seatConfiguration']}');
+      // Debug: Verify licenseNumber is in fields when driverEmail is provided
+      if (driverEmail != null && driverEmail.isNotEmpty) {
+        if (fields.containsKey('licenseNumber')) {
+          print('   ✅ VERIFIED: licenseNumber is in fields map: "${fields['licenseNumber']}"');
+        } else {
+          print('   ❌ ERROR: licenseNumber is MISSING from fields map even though driverEmail is provided!');
+        }
+      }
+      
+      // Prepare files for multipart
+      final files = <String, File>{};
+      if (mainImage != null) {
+        files['mainImage'] = mainImage;
+        print('   ✅ Added mainImage file: ${mainImage.path}');
+      }
+      // Note: Multiple gallery images need to be handled by MultipartClient
+      // For now, we'll only send the first gallery image if provided
+      // TODO: Update MultipartClient to support multiple files with same field name
+      if (galleryImages != null && galleryImages.isNotEmpty) {
+        // Send first image - backend may need multiple files with same name
+        files['galleryImages'] = galleryImages[0];
+        print('   ✅ Added galleryImage[0]: ${galleryImages[0].path}');
+        if (galleryImages.length > 1) {
+          print('   ⚠️ Note: Only first gallery image sent. ${galleryImages.length - 1} additional images not sent.');
+          print('   ⚠️ TODO: Update MultipartClient to support multiple files with same field name');
+        }
+      }
+      if (driverPhoto != null) {
+        files['driverPhoto'] = driverPhoto;
+        print('   ✅ Added driverPhoto file: ${driverPhoto.path}');
+      }
+      if (driverLicensePhoto != null) {
+        files['driverLicensePhoto'] = driverLicensePhoto;
+        print('   ✅ Added driverLicensePhoto file: ${driverLicensePhoto.path}');
+      }
+      
+      final response = await multipartClient.postMultipart(
+        endpoint: ApiConstants.counterBusCreate,
+        fields: fields,
+        files: files,
+        token: token,
       );
       
       print('📥 BusRemoteDataSource.createBus: Response received');
@@ -154,35 +388,87 @@ class BusRemoteDataSourceImpl implements BusRemoteDataSource {
     int? totalSeats,
     String? busType,
     String? driverContact,
+    String? driverEmail, // Driver email for invitation system
+    String? driverName, // Driver name (required if driverEmail provided)
+    String? driverLicenseNumber, // Driver license number (required if driverEmail provided)
+    String? driverId, // Existing driver ID
     double? commissionRate,
     List<int>? allowedSeats,
+    List<String>? seatConfiguration, // Custom seat identifiers (e.g., ["A1", "A4", "B6"])
+    List<String>? amenities, // Bus amenities (e.g., ["WiFi", "AC", "TV"])
+    List<Map<String, String>>? boardingPoints, // Boarding points with location and time
+    List<Map<String, String>>? droppingPoints, // Dropping points with location and time
+    String? routeId, // Route ID reference
+    String? scheduleId, // Schedule ID reference
+    double? distance, // Distance in kilometers
+    int? estimatedDuration, // Estimated duration in minutes
+    File? mainImage, // Main bus image file
+    List<File>? galleryImages, // Gallery image files
     required String token,
   }) async {
     try {
-      print('📤 BusRemoteDataSource.updateBus: Sending request');
+      print('📤 BusRemoteDataSource.updateBus: Sending multipart request');
       print('   BusId: $busId');
+      print('   SeatConfiguration: $seatConfiguration');
       
-      final body = <String, dynamic>{};
-      if (name != null) body['name'] = name;
-      if (vehicleNumber != null) body['vehicleNumber'] = vehicleNumber;
-      if (from != null) body['from'] = from;
-      if (to != null) body['to'] = to;
-      if (date != null) body['date'] = date.toIso8601String().split('T')[0];
-      if (time != null) body['time'] = time;
-      if (arrival != null) body['arrival'] = arrival;
-      if (price != null) body['price'] = price;
-      if (totalSeats != null) body['totalSeats'] = totalSeats;
-      if (busType != null) body['busType'] = busType;
-      if (driverContact != null) body['driverContact'] = driverContact;
-      if (commissionRate != null) body['commissionRate'] = commissionRate;
-      if (allowedSeats != null) body['allowedSeats'] = allowedSeats;
+      // Prepare form fields (all as strings for multipart)
+      final fields = <String, String>{};
+      if (name != null) fields['name'] = name;
+      if (vehicleNumber != null) fields['vehicleNumber'] = vehicleNumber;
+      if (from != null) fields['from'] = from;
+      if (to != null) fields['to'] = to;
+      if (date != null) fields['date'] = date.toIso8601String().split('T')[0];
+      if (time != null) fields['time'] = time;
+      if (arrival != null) fields['arrival'] = arrival;
+      if (price != null) fields['price'] = price.toString();
+      if (totalSeats != null) fields['totalSeats'] = totalSeats.toString();
+      if (busType != null) fields['busType'] = busType;
+      if (driverContact != null) fields['driverContact'] = driverContact;
+      if (driverId != null) fields['driverId'] = driverId;
+      if (driverEmail != null && driverEmail.isNotEmpty) {
+        fields['driverEmail'] = driverEmail;
+        if (driverName != null && driverName.isNotEmpty) {
+          fields['driverName'] = driverName;
+        }
+        // licenseNumber is required if driverEmail is provided (backend validation)
+        if (driverLicenseNumber != null && driverLicenseNumber.isNotEmpty) {
+          fields['licenseNumber'] = driverLicenseNumber;
+          print('   ✅ Added licenseNumber to fields: $driverLicenseNumber');
+        }
+      }
+      if (commissionRate != null) fields['commissionRate'] = commissionRate.toString();
+      if (allowedSeats != null && allowedSeats.isNotEmpty) {
+        fields['allowedSeats'] = jsonEncode(allowedSeats);
+      }
+      if (seatConfiguration != null && seatConfiguration.isNotEmpty) {
+        fields['seatConfiguration'] = jsonEncode(seatConfiguration);
+      }
+      if (amenities != null && amenities.isNotEmpty) {
+        fields['amenities'] = amenities.join(',');
+      }
+      if (boardingPoints != null && boardingPoints.isNotEmpty) {
+        fields['boardingPoints'] = jsonEncode(boardingPoints);
+      }
+      if (droppingPoints != null && droppingPoints.isNotEmpty) {
+        fields['droppingPoints'] = jsonEncode(droppingPoints);
+      }
+      if (routeId != null) fields['routeId'] = routeId;
+      if (scheduleId != null) fields['scheduleId'] = scheduleId;
+      if (distance != null) fields['distance'] = distance.toString();
+      if (estimatedDuration != null) fields['estimatedDuration'] = estimatedDuration.toString();
       
-      final response = await apiClient.put(
-        '${ApiConstants.counterMyBusUpdate}/$busId',
-        headers: {
-          ApiConstants.authorizationHeader: '${ApiConstants.bearerPrefix}$token',
-        },
-        body: body,
+      // Prepare files for multipart
+      final files = <String, File>{};
+      if (mainImage != null) files['mainImage'] = mainImage;
+      if (galleryImages != null && galleryImages.isNotEmpty) {
+        files['galleryImages'] = galleryImages[0]; // TODO: Support multiple files
+      }
+      
+      final response = await multipartClient.putMultipart(
+        endpoint: '${ApiConstants.counterMyBusUpdate}/$busId',
+        fields: fields,
+        files: files,
+        token: token,
       );
       
       print('📥 BusRemoteDataSource.updateBus: Response received');
@@ -356,10 +642,27 @@ class BusRemoteDataSourceImpl implements BusRemoteDataSource {
           return [];
         }
         
-        return buses.map((bus) {
-          // Handle assigned bus structure which may have busId and bus nested
-          final busData = bus is Map<String, dynamic> ? (bus['bus'] ?? bus) : bus;
-          return BusModel.fromJson(busData as Map<String, dynamic>);
+        return buses.map((busItem) {
+          // Handle assigned bus structure: {busId: {...}, accessId: "...", allowedSeats: [...]}
+          if (busItem is! Map<String, dynamic>) {
+            return BusModel.fromJson(busItem as Map<String, dynamic>);
+          }
+          
+          // Extract bus data - could be in 'busId' or 'bus' key
+          final busData = busItem['busId'] as Map<String, dynamic>? 
+              ?? busItem['bus'] as Map<String, dynamic>?
+              ?? busItem;
+          
+          // Merge accessId and allowedSeats from top level into bus data
+          final mergedBusData = <String, dynamic>{
+            ...busData,
+            if (busItem['accessId'] != null) 'accessId': busItem['accessId'],
+            if (busItem['allowedSeats'] != null) 'allowedSeats': busItem['allowedSeats'],
+            if (busItem['commissionEarned'] != null) 'commissionEarned': busItem['commissionEarned'],
+            if (busItem['totalBookings'] != null) 'totalBookings': busItem['totalBookings'],
+          };
+          
+          return BusModel.fromJson(mergedBusData);
         }).toList();
       } else {
         throw ServerException(response['message'] as String? ?? 'Failed to get assigned buses');
@@ -368,6 +671,50 @@ class BusRemoteDataSourceImpl implements BusRemoteDataSource {
       rethrow;
     } catch (e) {
       throw ServerException('Failed to get assigned buses: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<BusModel> searchBusByNumber({
+    required String busNumber,
+    required String token,
+  }) async {
+    try {
+      print('📤 BusRemoteDataSource.searchBusByNumber: Sending request');
+      print('   BusNumber: $busNumber');
+      
+      final response = await apiClient.get(
+        ApiConstants.counterBusSearch,
+        headers: {
+          ApiConstants.authorizationHeader: '${ApiConstants.bearerPrefix}$token',
+        },
+        queryParameters: {
+          'busNumber': busNumber,
+        },
+      );
+      
+      print('📥 BusRemoteDataSource.searchBusByNumber: Response received');
+      print('   Success: ${response['success']}');
+      
+      if (response['success'] == true && response['data'] != null) {
+        final data = response['data'] as Map<String, dynamic>;
+        // Response format: {success: true, data: {bus: {...}}}
+        final busData = data['bus'] ?? data;
+        
+        if (busData is! Map<String, dynamic>) {
+          throw ServerException('Invalid bus data format in response');
+        }
+        
+        print('   ✅ Bus found: ${busData['name'] ?? busData['vehicleNumber']}');
+        return BusModel.fromJson(busData);
+      } else {
+        throw ServerException(response['message'] as String? ?? 'Bus not found');
+      }
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      print('   ❌ BusRemoteDataSource.searchBusByNumber: Error: $e');
+      throw ServerException('Failed to search bus: ${e.toString()}');
     }
   }
 
@@ -393,15 +740,35 @@ class BusRemoteDataSourceImpl implements BusRemoteDataSource {
       
       if (response['success'] == true && response['data'] != null) {
         final data = response['data'] as Map<String, dynamic>;
-        // Assigned bus response has 'bus' key with the bus object
+        // New response format: {bus: {...}, hasAccess: bool, message?: string}
+        // Also supports old format: {bus: {...}} or bus object directly
         final busData = data['bus'] ?? data;
         
         if (busData is! Map<String, dynamic>) {
           throw ServerException('Invalid bus data format in response');
         }
         
-        print('   ✅ Parsing assigned bus data with ${busData.keys.length} fields');
-        return BusModel.fromJson(busData);
+        // Extract hasAccess if present (for new format)
+        final hasAccess = data['hasAccess'] as bool?;
+        final accessMessage = data['message'] as String?;
+        
+        print('   ✅ Parsing bus data with ${busData.keys.length} fields');
+        print('   HasAccess: $hasAccess');
+        if (accessMessage != null) {
+          print('   Message: $accessMessage');
+        }
+        
+        // Merge hasAccess info into bus data if available
+        final mergedBusData = <String, dynamic>{
+          ...busData,
+          // Store hasAccess in a way that can be accessed later if needed
+          // For now, we'll use accessId presence to determine access
+          // If hasAccess is false, ensure accessId is null
+          if (hasAccess == false && busData['accessId'] == null) 
+            'accessId': null,
+        };
+        
+        return BusModel.fromJson(mergedBusData);
       } else {
         throw ServerException(response['message'] as String? ?? 'Failed to get bus details');
       }

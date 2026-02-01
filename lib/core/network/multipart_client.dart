@@ -59,8 +59,19 @@ class MultipartClient {
       // Don't set Content-Type manually - http package will set it with proper boundary
       // request.headers['Content-Type'] = 'multipart/form-data';
 
+      // Use longer timeout for multipart requests (file uploads take longer)
+      print('   ⏱️ Timeout: ${ApiConstants.multipartTimeout}ms (${ApiConstants.multipartTimeout / 1000}s)');
+      print('   📁 Files being uploaded: ${files.length}');
+      for (var entry in files.entries) {
+        final file = entry.value;
+        if (await file.exists()) {
+          final fileSize = await file.length();
+          print('      - ${entry.key}: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+        }
+      }
+      
       final streamedResponse = await request.send().timeout(
-        const Duration(milliseconds: ApiConstants.receiveTimeout),
+        const Duration(milliseconds: ApiConstants.multipartTimeout),
       );
 
       final response = await http.Response.fromStream(streamedResponse);
@@ -184,9 +195,31 @@ class MultipartClient {
         print('   Error Message: $errorMessage');
         throw ServerException('[MultipartClient] $errorMessage');
       }
+    } on TimeoutException {
+      print('   ❌ Timeout Error: Connection timed out after ${ApiConstants.multipartTimeout / 1000}s');
+      print('   💡 Possible causes:');
+      print('      1. Server at $baseUrl is not running or not accessible');
+      print('      2. Network connectivity issues (check WiFi/mobile data)');
+      print('      3. Firewall blocking the connection');
+      print('      4. IP address changed (current: $baseUrl)');
+      print('      5. Files too large for slow network connection');
+      throw NetworkException(
+        'Connection timed out. Please check:\n'
+        '• Server is running at $baseUrl\n'
+        '• Device is connected to the same network\n'
+        '• IP address is correct (current: $baseUrl)\n'
+        '• Firewall is not blocking port 5000'
+      );
     } on http.ClientException catch (e) {
       print('   ❌ Network Error: ${e.message}');
-      throw NetworkException(e.message);
+      print('   💡 Check if server is accessible: $baseUrl');
+      throw NetworkException(
+        'Network error: ${e.message}\n'
+        'Please verify:\n'
+        '• Server is running at $baseUrl\n'
+        '• Device can reach the server (try ping or browser)\n'
+        '• IP address is correct'
+      );
     } on NetworkException {
       rethrow;
     } on AuthenticationException {
@@ -245,8 +278,9 @@ class MultipartClient {
         request.headers['Authorization'] = '${ApiConstants.bearerPrefix}$token';
       }
 
+      // Use longer timeout for multipart PUT requests
       final streamedResponse = await request.send().timeout(
-        const Duration(milliseconds: ApiConstants.receiveTimeout),
+        const Duration(milliseconds: ApiConstants.multipartTimeout),
       );
 
       final response = await http.Response.fromStream(streamedResponse);
@@ -310,8 +344,9 @@ class MultipartClient {
       // request.headers['Content-Type'] = 'multipart/form-data';
 
       print('   📤 Sending redirected request to: $redirectUrl');
+      // Use longer timeout for multipart redirect requests
       final streamedResponse = await request.send().timeout(
-        const Duration(milliseconds: ApiConstants.receiveTimeout),
+        const Duration(milliseconds: ApiConstants.multipartTimeout),
       );
 
       final response = await http.Response.fromStream(streamedResponse);

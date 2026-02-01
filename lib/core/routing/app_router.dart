@@ -9,6 +9,10 @@ import '../../features/authentication/presentation/pages/forgot_password_page.da
 import '../../features/authentication/presentation/pages/reset_password_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
 import '../../features/bus_driver/presentation/pages/driver_login_page.dart';
+import '../../features/bus_driver/presentation/pages/driver_dashboard_page.dart';
+import '../../features/bus_driver/presentation/pages/driver_tab_dashboard_page.dart';
+import '../../features/bus_driver/presentation/pages/driver_profile_edit_page.dart';
+import '../../features/bus_driver/presentation/pages/driver_bus_details_page.dart';
 import '../../features/booking/presentation/pages/booking_list_page.dart';
 import '../../features/booking/presentation/pages/create_booking_page.dart';
 import '../../features/booking/presentation/pages/booking_details_page.dart';
@@ -29,6 +33,8 @@ import '../../features/notifications/presentation/pages/notifications_page.dart'
 import '../../features/sales/presentation/pages/sales_page.dart';
 import '../../features/offline/presentation/pages/offline_page.dart';
 import '../../features/audit_logs/presentation/pages/audit_logs_page.dart';
+import '../../features/counter_request/presentation/pages/request_bus_access_page.dart';
+import '../../features/counter_request/presentation/pages/counter_requests_list_page.dart';
 
 class AppRouter {
   static final GoRouter router = GoRouter(
@@ -80,6 +86,30 @@ class AppRouter {
         path: '/driver/login',
         name: 'driver-login',
         builder: (context, state) => const DriverLoginPage(),
+      ),
+      GoRoute(
+        path: '/driver/dashboard',
+        name: 'driver-dashboard',
+        builder: (context, state) => const DriverTabDashboardPage(),
+      ),
+      // Keep old dashboard route for backward compatibility
+      GoRoute(
+        path: '/driver/dashboard/old',
+        name: 'driver-dashboard-old',
+        builder: (context, state) => const DriverDashboardPage(),
+      ),
+      GoRoute(
+        path: '/driver/profile/edit',
+        name: 'driver-profile-edit',
+        builder: (context, state) => const DriverProfileEditPage(),
+      ),
+      GoRoute(
+        path: '/driver/bus/:busId',
+        name: 'driver-bus-details',
+        builder: (context, state) {
+          final busId = state.pathParameters['busId']!;
+          return DriverBusDetailsPage(busId: busId);
+        },
       ),
       // Main shell route with bottom navigation bar
       StatefulShellRoute.indexedStack(
@@ -227,6 +257,20 @@ class AppRouter {
         path: '/audit-logs',
         name: 'audit-logs',
         builder: (context, state) => const AuditLogsPage(),
+      ),
+      // Counter Request Management
+      GoRoute(
+        path: '/counter/request-bus-access',
+        name: 'request-bus-access',
+        builder: (context, state) {
+          final busId = state.uri.queryParameters['busId'];
+          return RequestBusAccessPage(busId: busId);
+        },
+      ),
+      GoRoute(
+        path: '/counter/requests',
+        name: 'counter-requests',
+        builder: (context, state) => const CounterRequestsListPage(),
       ),
     ],
   );

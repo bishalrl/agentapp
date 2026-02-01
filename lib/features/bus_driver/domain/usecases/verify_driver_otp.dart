@@ -7,7 +7,7 @@ class VerifyDriverOtp {
   
   VerifyDriverOtp(this.repository);
   
-  Future<Result<DriverEntity>> call(String phoneNumber, String otp) async {
+  Future<Result<Map<String, dynamic>>> call(String phoneNumber, String otp) async {
     return await repository.verifyOtp(phoneNumber, otp);
   }
 }

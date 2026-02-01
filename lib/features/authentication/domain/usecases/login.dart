@@ -7,10 +7,11 @@ class Login {
 
   Login(this.repository);
 
-  Future<Result<AuthEntity>> call(String email, String password) async {
+  Future<Result<AuthEntity>> call(String email, String password, {String loginType = 'counter'}) async {
     print('🎯 Login UseCase.call: Starting');
     print('   Email: $email');
-    final result = await repository.login(email, password);
+    print('   LoginType: $loginType');
+    final result = await repository.login(email, password, loginType: loginType);
     if (result is Success<AuthEntity>) {
       print('   ✅ Login UseCase: Success');
     } else if (result is Error<AuthEntity>) {

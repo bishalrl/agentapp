@@ -73,7 +73,7 @@ class BookingModel extends BookingEntity {
             : DateTime.now(),
         time: originalTime ?? 'N/A',
         arrival: null,
-        price: (json['price'] as num?)?.toDouble() ?? 0.0,
+        price: BusInfoModel._parseToDouble(json['price']),
         totalSeats: 0,
         filledSeats: 0,
         availableSeats: 0,
@@ -82,16 +82,32 @@ class BookingModel extends BookingEntity {
       );
     }
     
-    // Handle seatNumbers - can be array or single number
-    List<int> seatNumbers;
+    // Handle seatNumbers - can be array or single number/string
+    // Supports both int (legacy) and String (new flexible format)
+    List<dynamic> seatNumbers;
     if (json['seatNumbers'] != null) {
       if (json['seatNumbers'] is List) {
-        seatNumbers = (json['seatNumbers'] as List<dynamic>).map((e) => (e as num).toInt()).toList();
+        seatNumbers = (json['seatNumbers'] as List<dynamic>).map((e) {
+          // Support both int and String
+          if (e is num) return e.toInt();
+          if (e is String) return e;
+          return e.toString();
+        }).toList();
       } else {
-        seatNumbers = [(json['seatNumbers'] as num).toInt()];
+        final seat = json['seatNumbers'];
+        if (seat is num) {
+          seatNumbers = [seat.toInt()];
+        } else {
+          seatNumbers = [seat.toString()];
+        }
       }
     } else if (json['seatNumber'] != null) {
-      seatNumbers = [(json['seatNumber'] as num).toInt()];
+      final seat = json['seatNumber'];
+      if (seat is num) {
+        seatNumbers = [seat.toInt()];
+      } else {
+        seatNumbers = [seat.toString()];
+      }
     } else {
       seatNumbers = [];
     }
@@ -118,9 +134,10 @@ class BookingModel extends BookingEntity {
               ? (json['bagCount'] as num).toInt() 
               : int.tryParse(json['bagCount'].toString()))
           : null,
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      totalPrice: (json['totalPrice'] as num?)?.toDouble() ?? 
-                  (json['price'] as num?)?.toDouble() ?? 0.0,
+      price: BusInfoModel._parseToDouble(json['price']),
+      totalPrice: BusInfoModel._parseToDouble(json['totalPrice']) != 0.0
+          ? BusInfoModel._parseToDouble(json['totalPrice'])
+          : BusInfoModel._parseToDouble(json['price']),
       status: json['status'] as String? ?? 'pending',
       paymentMethod: json['details']?['paymentMethod'] as String? ?? 
                      json['paymentMethod'] as String? ?? 
@@ -171,38 +188,104 @@ class BusInfoModel extends BusInfoEntity {
     required super.availableSeats,
     required super.bookedSeats,
     required super.lockedSeats,
+    super.seatConfiguration,
+    super.accessId,
+    super.allowedSeats,
+    super.hasAccess,
+    super.allowedSeatsCount,
+    super.hasRestrictedAccess,
+    super.hasFullAccess,
+    super.hasNoAccess,
+    super.availableAllowedSeats,
+    super.availableAllowedSeatsCount,
   });
+  
+  // Helper methods for parsing numeric values that might be strings
+  static double _parseToDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is num) return value.toDouble();
+    if (value is String) {
+      final parsed = double.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    return 0.0;
+  }
+  
+  static int? _parseToInt(dynamic value) {
+    if (value == null) return null;
+    if (value is num) return value.toInt();
+    if (value is String) {
+      final parsed = int.tryParse(value);
+      if (parsed != null) return parsed;
+    }
+    return null;
+  }
   
   factory BusInfoModel.fromJson(Map<String, dynamic> json) {
     print('🔍 BusInfoModel.fromJson: Parsing bus');
     print('   JSON keys: ${json.keys}');
     
-    // Handle date parsing with fallback
-    DateTime parseDate(String? dateStr) {
-      if (dateStr == null) return DateTime.now();
-      try {
-        return DateTime.parse(dateStr);
-      } catch (e) {
-        print('   ⚠️ Failed to parse date: $dateStr, using now()');
-        return DateTime.now();
+    try {
+      // Handle date parsing with fallback
+      DateTime parseDate(String? dateStr) {
+        if (dateStr == null) return DateTime.now();
+        try {
+          return DateTime.parse(dateStr);
+        } catch (e) {
+          print('   ⚠️ Failed to parse date: $dateStr, using now()');
+          return DateTime.now();
+        }
       }
-    }
-    
-    return BusInfoModel(
+      
+      // Route fallback: prefer top-level from/to, but support nested route object
+      String from = json['from'] as String? ?? '';
+      String to = json['to'] as String? ?? '';
+
+      final dynamic rawRoute = json['route'];
+      if (rawRoute is Map<String, dynamic>) {
+        final dynamic rawFrom = rawRoute['from'];
+        final dynamic rawTo = rawRoute['to'];
+
+        if ((from.isEmpty || from == 'Unknown' || from == 'N/A') && rawFrom != null) {
+          if (rawFrom is Map<String, dynamic>) {
+            from = rawFrom['name'] as String? ?? from;
+          } else if (rawFrom is String) {
+            from = rawFrom;
+          }
+        }
+
+        if ((to.isEmpty || to == 'Unknown' || to == 'N/A') && rawTo != null) {
+          if (rawTo is Map<String, dynamic>) {
+            to = rawTo['name'] as String? ?? to;
+          } else if (rawTo is String) {
+            to = rawTo;
+          }
+        }
+      }
+
+      from = from.isEmpty ? 'Unknown' : from;
+      to = to.isEmpty ? 'Unknown' : to;
+
+      return BusInfoModel(
       id: json['_id'] as String? ?? json['id'] as String? ?? 'unknown',
       name: json['name'] as String? ?? 'Unknown Bus',
-      from: json['from'] as String? ?? 'Unknown',
-      to: json['to'] as String? ?? 'Unknown',
+      from: from,
+      to: to,
       date: parseDate(json['date'] as String?),
       time: json['time'] as String? ?? 'N/A',
       arrival: json['arrival'] as String?,
-      price: (json['price'] as num?)?.toDouble() ?? 0.0,
-      totalSeats: (json['totalSeats'] as num?)?.toInt() ?? 0,
-      filledSeats: (json['filledSeats'] as num?)?.toInt() ?? 0,
-      availableSeats: (json['availableSeats'] as num?)?.toInt() ?? 
-                      (json['totalSeats'] as num?)?.toInt() ?? 0,
+      price: _parseToDouble(json['price']),
+      totalSeats: _parseToInt(json['totalSeats']) ?? 0,
+      filledSeats: _parseToInt(json['filledSeats']) ?? 0,
+      availableSeats: _parseToInt(json['availableSeats']) ?? 
+                      _parseToInt(json['totalSeats']) ?? 0,
       bookedSeats: (json['bookedSeats'] as List<dynamic>?)
-          ?.map((e) => (e as num).toInt())
+          ?.map((e) {
+            // Support both int (legacy) and String (new format)
+            if (e is num) return e.toInt();
+            if (e is String) return e;
+            return e.toString();
+          })
           .toList() ?? [],
       lockedSeats: (json['lockedSeats'] as List<dynamic>?)
           ?.map((e) {
@@ -216,7 +299,51 @@ class BusInfoModel extends BusInfoEntity {
           .whereType<SeatLockModel>()
           .toList()
           .cast<SeatLockEntity>() ?? [],
-    );
+      seatConfiguration: (json['seatConfiguration'] as List<dynamic>?)
+          ?.map((e) => e.toString())
+          .toList(),
+      accessId: json['accessId'] as String?,
+      hasAccess: json['hasAccess'] as bool?,
+      allowedSeats: (json['allowedSeats'] as List<dynamic>?)
+          ?.map<int>((e) {
+            // Handle both String and num types for allowedSeats
+            // Convert everything to int for consistency
+            if (e is num) return e.toInt();
+            if (e is String) {
+              // Try to parse as int, fallback to 0 if can't parse
+              final parsed = int.tryParse(e);
+              return parsed ?? 0;
+            }
+            // Try to convert to int, fallback to 0
+            if (e is int) return e;
+            return 0;
+          })
+          .toList(),
+      // New backend fields for enhanced seat access management
+      allowedSeatsCount: _parseToInt(json['allowedSeatsCount']),
+      hasRestrictedAccess: json['hasRestrictedAccess'] as bool?,
+      hasFullAccess: json['hasFullAccess'] as bool?,
+      hasNoAccess: json['hasNoAccess'] as bool?,
+      availableAllowedSeats: (json['availableAllowedSeats'] as List<dynamic>?)
+          ?.map<int>((e) {
+            if (e is num) return e.toInt();
+            if (e is String) {
+              final parsed = int.tryParse(e);
+              return parsed ?? 0;
+            }
+            if (e is int) return e;
+            return 0;
+          })
+          .toList(),
+      availableAllowedSeatsCount: _parseToInt(json['availableAllowedSeatsCount']),
+      );
+    } catch (e, stackTrace) {
+      print('   ❌ Error parsing BusInfoModel: $e');
+      print('   Stack trace: $stackTrace');
+      print('   Problematic JSON: $json');
+      // Re-throw with more context
+      throw Exception('Failed to parse BusInfoModel: $e. JSON keys: ${json.keys}');
+    }
   }
   
   Map<String, dynamic> toJson() {
@@ -234,6 +361,7 @@ class BusInfoModel extends BusInfoEntity {
       'availableSeats': availableSeats,
       'bookedSeats': bookedSeats,
       'lockedSeats': lockedSeats.map((e) => (e as SeatLockModel).toJson()).toList(),
+      if (seatConfiguration != null) 'seatConfiguration': seatConfiguration,
     };
   }
 }
@@ -259,8 +387,21 @@ class SeatLockModel extends SeatLockEntity {
       return DateTime.now().add(const Duration(hours: 1));
     }
     
+    // Support both int (legacy) and String (new format) for seatNumber
+    dynamic seatNumber;
+    final seatNumberValue = json['seatNumber'];
+    if (seatNumberValue is num) {
+      seatNumber = seatNumberValue.toInt();
+    } else if (seatNumberValue is String) {
+      seatNumber = seatNumberValue;
+    } else if (seatNumberValue != null) {
+      seatNumber = seatNumberValue.toString();
+    } else {
+      seatNumber = 0; // Default fallback
+    }
+    
     return SeatLockModel(
-      seatNumber: (json['seatNumber'] as num?)?.toInt() ?? 0,
+      seatNumber: seatNumber,
       lockedBy: json['lockedBy'] as String? ?? 
                 json['lockedByUser']?['_id'] as String? ?? 
                 json['lockedByUser'] as String? ?? 

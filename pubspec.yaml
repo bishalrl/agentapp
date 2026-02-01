@@ -74,6 +74,15 @@ dependencies:
   # File Picker
   image_picker: ^1.0.7
   file_picker: ^8.0.0
+  
+  # Maps and Location
+  google_maps_flutter: ^2.5.0
+  geolocator: ^12.0.0
+  
+  # QR Code Scanner
+  mobile_scanner: ^5.2.3
+  qr_flutter: ^4.1.0
+  hive_flutter: ^1.1.0
 
 dev_dependencies:
   flutter_test:
@@ -89,6 +98,9 @@ dev_dependencies:
   # Code generation
   build_runner: ^2.4.11
   injectable_generator: ^2.6.1
+  
+  # Launcher Icons
+  flutter_launcher_icons: ^0.10.0
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -131,3 +143,9 @@ flutter:
   #
   # For details regarding fonts from package dependencies,
   # see https://flutter.dev/to/font-from-package
+
+# Launcher Icons Configuration
+flutter_icons:
+  android: true
+  ios: true
+  image_path: "assets/logo.jpeg"

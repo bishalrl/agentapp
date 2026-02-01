@@ -21,7 +21,7 @@ class GetAvailableBusesEvent extends BookingEvent {
 
 class CreateBookingEvent extends BookingEvent {
   final String busId;
-  final List<int> seatNumbers;
+  final List<dynamic> seatNumbers; // Supports both int (legacy) and String (new format)
   final String passengerName;
   final String contactNumber;
   final String? passengerEmail;
@@ -127,7 +127,7 @@ class CancelBookingEvent extends BookingEvent {
 
 class LockSeatsEvent extends BookingEvent {
   final String busId;
-  final List<int> seatNumbers;
+  final List<dynamic> seatNumbers; // Supports both int (legacy) and String (new format)
 
   const LockSeatsEvent({
     required this.busId,
@@ -140,7 +140,7 @@ class LockSeatsEvent extends BookingEvent {
 
 class UnlockSeatsEvent extends BookingEvent {
   final String busId;
-  final List<int> seatNumbers;
+  final List<dynamic> seatNumbers; // Supports both int (legacy) and String (new format)
 
   const UnlockSeatsEvent({
     required this.busId,

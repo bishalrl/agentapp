@@ -3,7 +3,7 @@ class BookingEntity {
   final String ticketNumber;
   final String busId;
   final BusInfoEntity bus;
-  final List<int> seatNumbers;
+  final List<dynamic> seatNumbers; // Supports both int (legacy) and String (new format)
   final String passengerName;
   final String contactNumber;
   final String? passengerEmail;
@@ -50,8 +50,20 @@ class BusInfoEntity {
   final int totalSeats;
   final int filledSeats;
   final int availableSeats;
-  final List<int> bookedSeats;
+  final List<dynamic> bookedSeats; // Supports both int (legacy) and String (new format)
   final List<SeatLockEntity> lockedSeats;
+  final List<String>? seatConfiguration; // Custom seat identifiers (e.g., ["A1", "A4", "B6"])
+  final String? accessId; // Counter bus access ID (if counter has access)
+  final List<int>? allowedSeats; // Seats counter is allowed to book (null = all seats, empty = no access)
+  final bool? hasAccess; // Whether counter has access to this bus (from API response)
+  
+  // New backend fields for enhanced seat access management
+  final int? allowedSeatsCount; // Number of allowed seats
+  final bool? hasRestrictedAccess; // true if counter has limited seats
+  final bool? hasFullAccess; // true if counter can book all seats
+  final bool? hasNoAccess; // true if counter has no access
+  final List<int>? availableAllowedSeats; // Seats that are BOTH allowed AND available
+  final int? availableAllowedSeatsCount; // Count of available allowed seats
   
   const BusInfoEntity({
     required this.id,
@@ -67,11 +79,21 @@ class BusInfoEntity {
     required this.availableSeats,
     required this.bookedSeats,
     required this.lockedSeats,
+    this.seatConfiguration,
+    this.accessId,
+    this.allowedSeats,
+    this.hasAccess,
+    this.allowedSeatsCount,
+    this.hasRestrictedAccess,
+    this.hasFullAccess,
+    this.hasNoAccess,
+    this.availableAllowedSeats,
+    this.availableAllowedSeatsCount,
   });
 }
 
 class SeatLockEntity {
-  final int seatNumber;
+  final dynamic seatNumber; // Supports both int (legacy) and String (new format)
   final String lockedBy;
   final String lockedByType;
   final DateTime expiresAt;

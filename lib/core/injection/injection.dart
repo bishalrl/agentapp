@@ -14,13 +14,35 @@ import '../../features/bus_driver/data/repositories/driver_repository_impl.dart'
 import '../../features/bus_driver/domain/repositories/driver_repository.dart';
 import '../../features/bus_driver/domain/usecases/verify_driver_otp.dart';
 import '../../features/bus_driver/domain/usecases/get_driver_profile.dart';
-import '../../features/bus_driver/domain/usecases/get_assigned_buses.dart';
+import '../../features/bus_driver/domain/usecases/get_assigned_buses.dart' as driver_usecases;
+import '../../features/bus_driver/domain/usecases/register_driver.dart';
+import '../../features/bus_driver/domain/usecases/register_driver_with_invitation.dart';
+import '../../features/bus_driver/domain/usecases/driver_login.dart';
+import '../../features/bus_driver/domain/usecases/get_driver_dashboard.dart';
+import '../../features/bus_driver/domain/usecases/update_driver_profile.dart';
+import '../../features/bus_driver/domain/usecases/mark_bus_as_reached.dart';
+import '../../features/bus_driver/domain/usecases/get_pending_requests.dart';
+import '../../features/bus_driver/domain/usecases/accept_request.dart';
+import '../../features/bus_driver/domain/usecases/reject_request.dart';
+import '../../features/bus_driver/domain/usecases/get_bus_details.dart' as driver_usecases;
+import '../../features/bus_driver/domain/usecases/initiate_ride.dart';
+import '../../features/bus_driver/domain/usecases/update_driver_location.dart';
+import '../../features/bus_driver/domain/usecases/get_bus_passengers.dart';
+import '../../features/bus_driver/domain/usecases/verify_ticket.dart';
+import '../../features/bus_driver/domain/usecases/create_driver_booking.dart';
+import '../../features/bus_driver/domain/usecases/request_permission.dart';
+import '../../features/bus_driver/domain/usecases/get_permission_requests.dart';
 import '../../features/booking/data/datasources/booking_remote_data_source.dart';
+import '../../features/booking/data/datasources/booking_local_data_source.dart';
 import '../../features/booking/data/repositories/booking_repository_impl.dart';
 import '../../features/booking/domain/repositories/booking_repository.dart';
+import '../../features/dashboard/data/datasources/dashboard_local_data_source.dart';
+import '../../features/profile/data/datasources/profile_local_data_source.dart';
+import '../../features/bus_management/data/datasources/bus_local_data_source.dart';
+import '../../features/bus_driver/data/datasources/driver_local_data_source.dart';
 import '../../features/booking/domain/usecases/create_booking.dart';
 import '../../features/booking/domain/usecases/get_available_buses.dart';
-import '../../features/booking/domain/usecases/get_bus_details.dart';
+import '../../features/booking/domain/usecases/get_bus_details.dart' as booking_usecases;
 import '../../features/booking/domain/usecases/get_bookings.dart';
 import '../../features/booking/domain/usecases/get_booking_details.dart';
 import '../../features/booking/domain/usecases/cancel_booking.dart';
@@ -48,6 +70,7 @@ import '../../features/authentication/domain/usecases/forgot_password.dart';
 import '../../features/authentication/domain/usecases/reset_password.dart';
 import '../../features/authentication/domain/usecases/logout.dart';
 import '../../features/authentication/domain/usecases/get_stored_token.dart';
+import '../../features/authentication/domain/usecases/get_stored_session_type.dart';
 import '../../features/authentication/domain/usecases/clear_token.dart';
 import '../../features/authentication/presentation/bloc/auth_bloc.dart';
 import '../../features/authentication/presentation/bloc/signup_bloc.dart';
@@ -69,6 +92,8 @@ import '../../features/bus_management/domain/usecases/create_bus.dart';
 import '../../features/bus_management/domain/usecases/update_bus.dart';
 import '../../features/bus_management/domain/usecases/delete_bus.dart';
 import '../../features/bus_management/domain/usecases/get_my_buses.dart';
+import '../../features/bus_management/domain/usecases/get_assigned_buses.dart' as bus_management_usecases;
+import '../../features/bus_management/domain/usecases/search_bus_by_number.dart';
 import '../../features/bus_management/domain/usecases/activate_bus.dart';
 import '../../features/bus_management/domain/usecases/deactivate_bus.dart';
 import '../../features/bus_management/presentation/bloc/bus_bloc.dart';
@@ -138,6 +163,12 @@ import '../../features/audit_logs/data/repositories/audit_log_repository_impl.da
 import '../../features/audit_logs/domain/repositories/audit_log_repository.dart';
 import '../../features/audit_logs/domain/usecases/get_audit_logs.dart';
 import '../../features/audit_logs/presentation/bloc/audit_log_bloc.dart';
+import '../../features/counter_request/data/datasources/counter_request_remote_data_source.dart';
+import '../../features/counter_request/data/repositories/counter_request_repository_impl.dart';
+import '../../features/counter_request/domain/repositories/counter_request_repository.dart';
+import '../../features/counter_request/domain/usecases/request_bus_access.dart';
+import '../../features/counter_request/domain/usecases/get_counter_requests.dart';
+import '../../features/counter_request/presentation/bloc/counter_request_bloc.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 final sl = GetIt.instance;
@@ -164,27 +195,92 @@ Future<void> init() async {
     () => OnboardingLocalDataSourceImpl(sl()),
   );
 
+  //! Features - Counter Request Management
+  // Bloc
+  sl.registerFactory(() => CounterRequestBloc(
+        requestBusAccess: sl(),
+        getCounterRequests: sl(),
+      ));
+
+  // Use cases
+  sl.registerLazySingleton(() => RequestBusAccess(sl()));
+  sl.registerLazySingleton(() => GetCounterRequests(sl()));
+
+  // Repository
+  sl.registerLazySingleton<CounterRequestRepository>(
+    () => CounterRequestRepositoryImpl(
+      remoteDataSource: sl(),
+      getStoredToken: sl(),
+    ),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<CounterRequestRemoteDataSource>(
+    () => CounterRequestRemoteDataSourceImpl(sl()),
+  );
+
   //! Features - Bus Driver
   // Bloc
   sl.registerFactory(() => DriverBloc(
         verifyOtp: sl(),
         getProfile: sl(),
         getBuses: sl(),
+        registerDriver: sl(),
+        registerWithInvitation: sl(),
+        driverLogin: sl(),
+        getDashboard: sl(),
+        updateProfile: sl(),
+        markBusAsReached: sl(),
+        getPendingRequests: sl(),
+        acceptRequest: sl(),
+        rejectRequest: sl(),
+        getBusDetails: sl(),
+        initiateRide: sl(),
+        updateDriverLocation: sl(),
+        getBusPassengers: sl(),
+        verifyTicket: sl(),
+        createDriverBooking: sl(),
+        requestPermission: sl(),
+        getPermissionRequests: sl(),
       ));
 
   // Use cases
   sl.registerLazySingleton(() => VerifyDriverOtp(sl()));
   sl.registerLazySingleton(() => GetDriverProfile(sl()));
-  sl.registerLazySingleton(() => GetAssignedBuses(sl()));
+  sl.registerLazySingleton(() => driver_usecases.GetAssignedBuses(sl()));
+  sl.registerLazySingleton(() => RegisterDriver(sl()));
+  sl.registerLazySingleton(() => RegisterDriverWithInvitation(sl()));
+  sl.registerLazySingleton(() => DriverLogin(sl()));
+  sl.registerLazySingleton(() => GetDriverDashboard(sl()));
+  sl.registerLazySingleton(() => UpdateDriverProfile(sl()));
+  sl.registerLazySingleton(() => MarkBusAsReached(sl()));
+  sl.registerLazySingleton(() => GetPendingRequests(sl()));
+  sl.registerLazySingleton(() => AcceptRequest(sl()));
+  sl.registerLazySingleton(() => RejectRequest(sl()));
+  sl.registerLazySingleton(() => driver_usecases.GetBusDetails(sl()));
+  sl.registerLazySingleton(() => InitiateRide(sl()));
+  sl.registerLazySingleton(() => UpdateDriverLocation(sl()));
+  sl.registerLazySingleton(() => GetBusPassengers(sl()));
+  sl.registerLazySingleton(() => VerifyTicket(sl()));
+  sl.registerLazySingleton(() => CreateDriverBooking(sl()));
+  sl.registerLazySingleton(() => RequestPermission(sl()));
+  sl.registerLazySingleton(() => GetPermissionRequests(sl()));
 
   // Repository
   sl.registerLazySingleton<DriverRepository>(
-    () => DriverRepositoryImpl(sl(), token: null),
+    () => DriverRepositoryImpl(
+      remoteDataSource: sl(),
+      localDataSource: sl(),
+      getStoredToken: sl(),
+    ),
   );
 
   // Data sources
   sl.registerLazySingleton<DriverRemoteDataSource>(
-    () => DriverRemoteDataSourceImpl(sl()),
+    () => DriverRemoteDataSourceImpl(sl(), sl()), // ApiClient and MultipartClient
+  );
+  sl.registerLazySingleton<DriverLocalDataSource>(
+    () => DriverLocalDataSourceImpl(sl()),
   );
 
   //! Features - Booking
@@ -204,7 +300,7 @@ Future<void> init() async {
 
   // Use cases
   sl.registerLazySingleton(() => GetAvailableBuses(sl()));
-  sl.registerLazySingleton(() => GetBusDetails(sl()));
+  sl.registerLazySingleton(() => booking_usecases.GetBusDetails(sl()));
   sl.registerLazySingleton(() => GetBookings(sl()));
   sl.registerLazySingleton(() => GetBookingDetails(sl()));
   sl.registerLazySingleton(() => CreateBooking(sl()));
@@ -216,12 +312,15 @@ Future<void> init() async {
 
   // Repository
   sl.registerLazySingleton<BookingRepository>(
-    () => BookingRepositoryImpl(sl(), getStoredToken: sl()),
+    () => BookingRepositoryImpl(sl(), sl(), getStoredToken: sl()),
   );
 
   // Data sources
   sl.registerLazySingleton<BookingRemoteDataSource>(
     () => BookingRemoteDataSourceImpl(sl()),
+  );
+  sl.registerLazySingleton<BookingLocalDataSource>(
+    () => BookingLocalDataSourceImpl(sl()),
   );
 
   //! Features - Dashboard
@@ -233,17 +332,23 @@ Future<void> init() async {
 
   // Repository
   sl.registerLazySingleton<DashboardRepository>(
-    () => DashboardRepositoryImpl(sl(), getStoredToken: sl()),
+    () => DashboardRepositoryImpl(sl(), sl(), getStoredToken: sl()),
   );
 
   // Data sources
   sl.registerLazySingleton<DashboardRemoteDataSource>(
     () => DashboardRemoteDataSourceImpl(sl()),
   );
+  sl.registerLazySingleton<DashboardLocalDataSource>(
+    () => DashboardLocalDataSourceImpl(sl()),
+  );
 
   //! Features - Splash
   // Bloc
-  sl.registerFactory(() => SplashBloc(getStoredToken: sl()));
+  sl.registerFactory(() => SplashBloc(
+        getStoredToken: sl(),
+        getStoredSessionType: sl(),
+      ));
 
   //! Features - Authentication
   // Bloc
@@ -273,6 +378,7 @@ Future<void> init() async {
   sl.registerLazySingleton(() => ResetPassword(sl()));
   sl.registerLazySingleton(() => Logout(sl()));
   sl.registerLazySingleton(() => GetStoredToken(sl()));
+  sl.registerLazySingleton(() => GetStoredSessionType(sl()));
   sl.registerLazySingleton(() => ClearToken(sl()));
 
   // Repository
@@ -324,6 +430,8 @@ Future<void> init() async {
         updateBus: sl(),
         deleteBus: sl(),
         getMyBuses: sl(),
+        getAssignedBuses: sl(),
+        searchBusByNumber: sl(),
         activateBus: sl(),
         deactivateBus: sl(),
       ));
@@ -333,6 +441,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => UpdateBus(sl()));
   sl.registerLazySingleton(() => DeleteBus(sl()));
   sl.registerLazySingleton(() => GetMyBuses(sl()));
+  sl.registerLazySingleton(() => bus_management_usecases.GetAssignedBuses(sl(), sl()));
+  sl.registerLazySingleton(() => SearchBusByNumber(sl(), sl()));
   sl.registerLazySingleton(() => ActivateBus(sl()));
   sl.registerLazySingleton(() => DeactivateBus(sl()));
 
@@ -340,6 +450,7 @@ Future<void> init() async {
   sl.registerLazySingleton<BusRepository>(
     () => BusRepositoryImpl(
       remoteDataSource: sl(),
+      localDataSource: sl(),
       getStoredToken: sl(),
       networkInfo: sl(),
     ),
@@ -347,7 +458,10 @@ Future<void> init() async {
 
   // Data sources
   sl.registerLazySingleton<BusRemoteDataSource>(
-    () => BusRemoteDataSourceImpl(sl()),
+    () => BusRemoteDataSourceImpl(sl(), sl()),
+  );
+  sl.registerLazySingleton<BusLocalDataSource>(
+    () => BusLocalDataSourceImpl(sl()),
   );
 
   //! Features - Route Management
@@ -396,6 +510,7 @@ Future<void> init() async {
   sl.registerLazySingleton<ProfileRepository>(
     () => ProfileRepositoryImpl(
       remoteDataSource: sl(),
+      localDataSource: sl(),
       getStoredToken: sl(),
     ),
   );
@@ -403,6 +518,9 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<ProfileRemoteDataSource>(
     () => ProfileRemoteDataSourceImpl(sl(), sl()),
+  );
+  sl.registerLazySingleton<ProfileLocalDataSource>(
+    () => ProfileLocalDataSourceImpl(sl()),
   );
 
   //! Features - Wallet Management

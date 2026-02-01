@@ -1,13 +1,18 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../authentication/domain/usecases/get_stored_token.dart';
+import '../../../authentication/domain/usecases/get_stored_session_type.dart';
 import 'events/splash_event.dart';
 import 'states/splash_state.dart';
 
 class SplashBloc extends Bloc<SplashEvent, SplashState> {
   final GetStoredToken getStoredToken;
+  final GetStoredSessionType getStoredSessionType;
 
-  SplashBloc({required this.getStoredToken}) : super(const SplashState()) {
+  SplashBloc({
+    required this.getStoredToken,
+    required this.getStoredSessionType,
+  }) : super(const SplashState()) {
     on<CheckAuthEvent>(_onCheckAuth);
   }
 
@@ -33,11 +38,27 @@ class SplashBloc extends Bloc<SplashEvent, SplashState> {
     } else if (result is Success<String?>) {
       final token = result.data;
       if (token != null && token.isNotEmpty) {
-        print('   ✅ CheckAuth Success: Token found, nextRoute=/dashboard');
+        // Determine which kind of session this is (counter/betaAgent vs driver)
+        final sessionTypeResult = await getStoredSessionType();
+        String? sessionType;
+        if (sessionTypeResult is Success<String?>) {
+          sessionType = sessionTypeResult.data;
+        } else {
+          print('   ⚠️ CheckAuth: Failed to get session type, defaulting to counter');
+        }
+
+        // Route to driver dashboard for drivers, otherwise to counter/betaAgent dashboard
+        final nextRoute =
+            sessionType == 'driver' ? '/driver/dashboard' : '/dashboard';
+        
+        print('   📍 Session type: $sessionType (counter/betaAgent use same dashboard)');
+
+        print(
+            '   ✅ CheckAuth Success: Token found, sessionType=$sessionType, nextRoute=$nextRoute');
         emit(state.copyWith(
           isLoading: false,
           isAuthenticated: true,
-          nextRoute: '/dashboard',
+          nextRoute: nextRoute,
         ));
       } else {
         print('   ⚠️ CheckAuth: No token found, nextRoute=/onboarding');

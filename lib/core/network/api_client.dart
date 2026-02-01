@@ -35,10 +35,31 @@ class ApiClient {
       
       return _handleResponse(response);
     } on http.ClientException catch (e) {
+      // Check for "Broken pipe" and connection errors in ClientException message
+      final errorMessage = e.message.toLowerCase();
+      if (errorMessage.contains('broken pipe') ||
+          errorMessage.contains('connection closed') ||
+          errorMessage.contains('connection') && errorMessage.contains('closed')) {
+        throw NetworkException(
+          'Network connection error. Please check your internet connection and try again.'
+        );
+      }
       throw NetworkException(e.message);
+    } on TimeoutException {
+      throw NetworkException(
+        'Request timed out. Please check your internet connection and try again.'
+      );
     } catch (e) {
       if (e is NetworkException || e is ServerException) {
         rethrow;
+      }
+      // Check for "Broken pipe" in error message
+      final errorString = e.toString().toLowerCase();
+      if (errorString.contains('broken pipe') ||
+          errorString.contains('connection closed')) {
+        throw NetworkException(
+          'Network connection error. Please check your internet connection and try again.'
+        );
       }
       throw NetworkException('Network error: ${e.toString()}');
     }
@@ -55,10 +76,22 @@ class ApiClient {
       print('   Full URL: $uri');
       print('   Headers: ${_buildHeaders(headers)}');
       
+      String? jsonBody;
+      if (body != null) {
+        jsonBody = jsonEncode(body);
+        print('   📋 Request body keys: ${body.keys.toList()}');
+        print('   📋 Request body (first 500 chars): ${jsonBody.length > 500 ? jsonBody.substring(0, 500) + "..." : jsonBody}');
+        if (body.containsKey('seatConfiguration')) {
+          print('   ✅ seatConfiguration in body: ${body['seatConfiguration']}');
+        } else {
+          print('   ⚠️ seatConfiguration NOT in body');
+        }
+      }
+      
       final response = await client.post(
         uri,
         headers: _buildHeaders(headers),
-        body: body != null ? jsonEncode(body) : null,
+        body: jsonBody,
       ).timeout(
         const Duration(milliseconds: ApiConstants.connectTimeout),
       );
@@ -67,10 +100,9 @@ class ApiClient {
       print('   Status Code: ${response.statusCode}');
       
       return _handleResponse(response);
-    } on TimeoutException catch (e) {
+    } on TimeoutException {
       print('❌ ApiClient.post: TimeoutException');
-      print('   Error: ${e.message ?? "Request timeout"}');
-      throw NetworkException('Request timeout: ${e.message ?? "Connection timed out"}');
+      throw NetworkException('Request timeout: Connection timed out. Please check your internet connection and try again.');
     } on http.ClientException catch (e) {
       print('❌ ApiClient.post: ClientException');
       print('   Error: ${e.message}');
@@ -79,9 +111,14 @@ class ApiClient {
       print('❌ ApiClient.post: Unexpected error');
       print('   Error type: ${e.runtimeType}');
       print('   Error: $e');
-      if (e is NetworkException || e is ServerException) {
+      // Re-throw known API exceptions so higher layers can handle them correctly
+      if (e is NetworkException ||
+          e is ServerException ||
+          e is AuthenticationException ||
+          e is AuthorizationException) {
         rethrow;
       }
+      // Fallback: treat as generic network error
       throw NetworkException('Network error: ${e.toString()}');
     }
   }
@@ -215,38 +252,76 @@ class ApiClient {
     } else if (statusCode == 404) {
       throw NotFoundException('Not found');
     } else {
-      // Try to extract meaningful error message from response
-      String errorMessage = 'Server error';
+      // Extract raw error message from response (for logging only)
+      String rawErrorMessage = 'Server error';
       try {
         if (body.isNotEmpty) {
           final json = jsonDecode(body) as Map<String, dynamic>;
           // Try multiple possible error message fields
-          errorMessage = json['message'] as String? ?? 
+          rawErrorMessage = json['message'] as String? ?? 
                         json['error'] as String? ?? 
                         json['msg'] as String? ??
                         (json['errors'] != null ? json['errors'].toString() : null) ??
                         'Server error';
         }
       } catch (e) {
-        // If JSON parsing fails, try to use the raw body if it's not too long
-        if (body.isNotEmpty && body.length < 500) {
-          errorMessage = 'Server error: $body';
-        } else {
-          errorMessage = 'Server error (Status: $statusCode)';
-        }
+        // If JSON parsing fails, use status code
+        rawErrorMessage = 'Server error (Status: $statusCode)';
       }
       
-      // Provide more specific error messages based on status code
+      // Log raw error for debugging (but don't expose to users)
+      print('⚠️ Raw backend error (Status $statusCode): $rawErrorMessage');
+      
+      // Create a sanitized error message based on status code
+      // The ErrorMessageSanitizer will further sanitize this in BLoCs
+      String sanitizedMessage;
       if (statusCode >= 500) {
-        errorMessage = 'Server error: $errorMessage. Please try again later or contact support.';
-      } else if (statusCode >= 400) {
-        errorMessage = 'Request error: $errorMessage';
+        sanitizedMessage = 'Server error occurred. Please try again later or contact support if the problem persists.';
+      } else if (statusCode == 404) {
+        sanitizedMessage = 'The requested item was not found.';
+      } else if (statusCode == 403) {
+        sanitizedMessage = 'You do not have permission to perform this action.';
+      } else if (statusCode == 400) {
+        // For 400 errors, try to extract user-friendly validation message
+        // but sanitize it to remove technical details
+        sanitizedMessage = _sanitize400Error(rawErrorMessage);
+      } else {
+        sanitizedMessage = 'An error occurred. Please try again.';
       }
       
-      throw ServerException(errorMessage);
+      throw ServerException(sanitizedMessage);
     }
   }
   
+  /// Sanitize 400 Bad Request errors to extract user-friendly messages
+  String _sanitize400Error(String rawMessage) {
+    final lowerMessage = rawMessage.toLowerCase();
+    
+    // Check for validation-like errors that might be user-actionable
+    if (lowerMessage.contains('already exists') || lowerMessage.contains('duplicate')) {
+      return 'This item already exists. Please use a different value.';
+    }
+    
+    if (lowerMessage.contains('required') || lowerMessage.contains('missing')) {
+      return 'Please fill in all required fields.';
+    }
+    
+    if (lowerMessage.contains('invalid')) {
+      return 'Invalid input. Please check your information and try again.';
+    }
+    
+    // Remove technical details
+    if (rawMessage.contains('Error:') || 
+        rawMessage.contains('Exception:') ||
+        rawMessage.contains('at ') ||
+        rawMessage.length > 200) {
+      return 'Invalid request. Please check your input and try again.';
+    }
+    
+    // If message seems user-friendly and short, return as-is
+    return rawMessage.length < 100 ? rawMessage : 'Invalid request. Please check your input and try again.';
+  }
+
   /// Check if response is HTML (parking page, error page)
   bool _isHtmlResponse(String responseBody) {
     if (responseBody.isEmpty) return false;

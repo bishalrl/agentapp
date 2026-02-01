@@ -8,8 +8,12 @@ import '../bloc/states/dashboard_state.dart';
 import '../../domain/entities/dashboard_entity.dart';
 import '../../../../core/injection/injection.dart' as di;
 import '../../../../core/widgets/error_snackbar.dart';
-import '../../../../core/widgets/back_button_handler.dart';
 import '../../../../core/widgets/main_drawer.dart';
+import '../../../../core/widgets/enhanced_card.dart';
+import '../../../../core/widgets/stat_card.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/animations/scroll_animations.dart';
+import '../../../../core/animations/touch_animations.dart';
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -125,17 +129,74 @@ class DashboardPage extends StatelessWidget {
                 context.read<DashboardBloc>().add(const GetDashboardEvent());
               },
               child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
+                padding: const EdgeInsets.all(AppTheme.spacingM),
+                physics: const BouncingScrollPhysics(),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    _CounterInfoCard(counter: dashboard.counter),
-                    const SizedBox(height: 16),
-                    _QuickActionsSection(),
-                    const SizedBox(height: 16),
-                    _TodayStatsCard(stats: dashboard.todayStats),
-                    const SizedBox(height: 16),
-                    _AssignedBusesSection(assignedBuses: dashboard.assignedBuses),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 300),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return Opacity(
+                          opacity: value,
+                          child: Transform.translate(
+                            offset: Offset(0, 20 * (1 - value)),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _CounterInfoCard(counter: dashboard.counter),
+                    ),
+                    const SizedBox(height: AppTheme.spacingM),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 350),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return Opacity(
+                          opacity: value,
+                          child: Transform.translate(
+                            offset: Offset(0, 20 * (1 - value)),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _TodayStatsCard(stats: dashboard.todayStats),
+                    ),
+                    const SizedBox(height: AppTheme.spacingM),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 400),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return Opacity(
+                          opacity: value,
+                          child: Transform.translate(
+                            offset: Offset(0, 20 * (1 - value)),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _QuickActionsSection(),
+                    ),
+                    const SizedBox(height: AppTheme.spacingM),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 450),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return Opacity(
+                          opacity: value,
+                          child: Transform.translate(
+                            offset: Offset(0, 20 * (1 - value)),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: _AssignedBusesSection(assignedBuses: dashboard.assignedBuses),
+                    ),
                   ],
                 ),
               ),
@@ -155,66 +216,90 @@ class _CounterInfoCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.primaryContainer,
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Icon(
-                    Icons.business,
-                    color: Theme.of(context).colorScheme.primary,
-                  ),
+    final theme = Theme.of(context);
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(AppTheme.spacingM),
+                decoration: BoxDecoration(
+                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(AppTheme.radiusM),
                 ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        counter.agencyName,
-                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                      ),
-                      Text(
-                        counter.email,
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: Colors.grey[600],
-                            ),
-                      ),
-                    ],
-                  ),
+                child: Icon(
+                  Icons.business_center_rounded,
+                  color: AppTheme.primaryColor,
+                  size: 28,
                 ),
-              ],
+              ),
+              const SizedBox(width: AppTheme.spacingM),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      counter.agencyName,
+                      style: theme.textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.bold,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: AppTheme.spacingXS),
+                    Text(
+                      counter.email,
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingL),
+          Container(
+            padding: const EdgeInsets.all(AppTheme.spacingM),
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.05),
+              borderRadius: BorderRadius.circular(AppTheme.radiusM),
+              border: Border.all(
+                color: AppTheme.primaryColor.withOpacity(0.2),
+              ),
             ),
-            const Divider(height: 32),
-            Row(
+            child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Wallet Balance',
-                  style: Theme.of(context).textTheme.bodyLarge,
+                Row(
+                  children: [
+                    Icon(
+                      Icons.account_balance_wallet_rounded,
+                      color: AppTheme.primaryColor,
+                      size: 24,
+                    ),
+                    const SizedBox(width: AppTheme.spacingS),
+                    Text(
+                      'Wallet Balance',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
                   'Rs. ${NumberFormat('#,##0.00').format(counter.walletBalance)}',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
+                  style: theme.textTheme.headlineMedium?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: AppTheme.primaryColor,
+                  ),
                 ),
               ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -227,111 +312,79 @@ class _TodayStatsCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Today\'s Statistics',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatItem(
-                    icon: Icons.confirmation_number,
-                    label: 'Bookings',
-                    value: stats.totalBookings.toString(),
-                    color: Colors.blue,
-                  ),
-                ),
-                Expanded(
-                  child: _StatItem(
-                    icon: Icons.currency_rupee,
-                    label: 'Sales',
-                    value: 'Rs. ${NumberFormat('#,##0').format(stats.totalSales)}',
-                    color: Colors.green,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Expanded(
-                  child: _StatItem(
-                    icon: Icons.money,
-                    label: 'Cash',
-                    value: 'Rs. ${NumberFormat('#,##0').format(stats.cashSales)}',
-                    color: Colors.orange,
-                  ),
-                ),
-                Expanded(
-                  child: _StatItem(
-                    icon: Icons.payment,
-                    label: 'Online',
-                    value: 'Rs. ${NumberFormat('#,##0').format(stats.onlineSales)}',
-                    color: Colors.purple,
-                  ),
-                ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _StatItem extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String value;
-  final Color color;
-
-  const _StatItem({
-    required this.icon,
-    required this.label,
-    required this.value,
-    required this.color,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.all(4),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-      ),
+    final theme = Theme.of(context);
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 32),
-          const SizedBox(height: 8),
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+          Row(
+            children: [
+              Icon(
+                Icons.today_rounded,
+                color: AppTheme.primaryColor,
+                size: 24,
+              ),
+              const SizedBox(width: AppTheme.spacingS),
+              Text(
+                'Today\'s Statistics',
+                style: theme.textTheme.titleLarge?.copyWith(
                   fontWeight: FontWeight.bold,
-                  color: color,
+                  color: AppTheme.textPrimary,
                 ),
+              ),
+            ],
           ),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
+          const SizedBox(height: AppTheme.spacingL),
+          Row(
+            children: [
+              Expanded(
+                child: StatCard(
+                  title: 'Bookings',
+                  value: stats.totalBookings.toString(),
+                  icon: Icons.confirmation_number_rounded,
+                  iconColor: Colors.blue,
                 ),
+              ),
+              const SizedBox(width: AppTheme.spacingM),
+              Expanded(
+                child: StatCard(
+                  title: 'Total Sales',
+                  value: 'Rs. ${NumberFormat('#,##0').format(stats.totalSales)}',
+                  icon: Icons.currency_rupee_rounded,
+                  iconColor: AppTheme.successColor,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingM),
+          Row(
+            children: [
+              Expanded(
+                child: StatCard(
+                  title: 'Cash Sales',
+                  value: 'Rs. ${NumberFormat('#,##0').format(stats.cashSales)}',
+                  icon: Icons.money_rounded,
+                  iconColor: AppTheme.warningColor,
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingM),
+              Expanded(
+                child: StatCard(
+                  title: 'Online Sales',
+                  value: 'Rs. ${NumberFormat('#,##0').format(stats.onlineSales)}',
+                  icon: Icons.payment_rounded,
+                  iconColor: Colors.purple,
+                ),
+              ),
+            ],
           ),
         ],
       ),
     );
   }
 }
+
 
 class _AssignedBusesSection extends StatelessWidget {
   final Map<String, Map<String, RouteBusesEntity>> assignedBuses;
@@ -340,23 +393,26 @@ class _AssignedBusesSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
     if (assignedBuses.isEmpty) {
-      return Card(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Center(
-            child: Column(
-              children: [
-                Icon(Icons.directions_bus_outlined, size: 64, color: Colors.grey[400]),
-                const SizedBox(height: 16),
-                Text(
-                  'No buses assigned',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: Colors.grey[600],
-                      ),
+      return EnhancedCard(
+        padding: const EdgeInsets.all(AppTheme.spacingXXL),
+        child: Center(
+          child: Column(
+            children: [
+              Icon(
+                Icons.directions_bus_outlined,
+                size: 64,
+                color: AppTheme.textTertiary,
+              ),
+              const SizedBox(height: AppTheme.spacingM),
+              Text(
+                'No buses assigned',
+                style: theme.textTheme.titleMedium?.copyWith(
+                  color: AppTheme.textSecondary,
                 ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       );
@@ -365,44 +421,156 @@ class _AssignedBusesSection extends StatelessWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          'Assigned Buses',
-          style: Theme.of(context).textTheme.titleLarge?.copyWith(
+        Row(
+          children: [
+            Icon(
+              Icons.directions_bus_rounded,
+              color: AppTheme.primaryColor,
+              size: 24,
+            ),
+            const SizedBox(width: AppTheme.spacingS),
+            Text(
+              'Assigned Buses',
+              style: theme.textTheme.titleLarge?.copyWith(
                 fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
               ),
+            ),
+          ],
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: AppTheme.spacingL),
         ...assignedBuses.entries.map((dateEntry) {
           return Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                DateFormat('EEEE, MMMM d, y').format(DateTime.parse(dateEntry.key)),
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w600,
-                    ),
+              Padding(
+                padding: const EdgeInsets.only(left: AppTheme.spacingS),
+                child: Text(
+                  DateFormat('EEEE, MMMM d, y').format(DateTime.parse(dateEntry.key)),
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
               ),
-              const SizedBox(height: 8),
+              const SizedBox(height: AppTheme.spacingS),
               ...dateEntry.value.entries.map((routeEntry) {
                 final routeBuses = routeEntry.value;
-                return Card(
-                  margin: const EdgeInsets.only(bottom: 12),
+                return EnhancedCard(
+                  margin: const EdgeInsets.only(bottom: AppTheme.spacingM),
                   child: ExpansionTile(
-                    leading: const Icon(Icons.route),
-                    title: Text('${routeBuses.route.from} → ${routeBuses.route.to}'),
-                    subtitle: Text('${routeBuses.buses.length} bus(es)'),
+                    leading: Container(
+                      padding: const EdgeInsets.all(AppTheme.spacingS),
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                      ),
+                      child: Icon(
+                        Icons.route_rounded,
+                        color: AppTheme.primaryColor,
+                        size: 20,
+                      ),
+                    ),
+                    title: Text(
+                      '${routeBuses.route.from} → ${routeBuses.route.to}',
+                      style: theme.textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    subtitle: Text(
+                      '${routeBuses.buses.length} bus(es)',
+                      style: theme.textTheme.bodySmall,
+                    ),
                     children: routeBuses.buses.map((bus) {
-                      return ListTile(
-                        leading: const Icon(Icons.directions_bus),
-                        title: Text(bus.name),
-                        subtitle: Text('${bus.time} • ${bus.totalSeats} seats'),
-                        trailing: Text(
-                          'Rs. ${NumberFormat('#,##0').format(bus.price)}',
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        onTap: () {
-                          // TODO: Navigate to bus details
-                        },
+                      final hasAccess = bus.accessId != null || (bus.allowedSeats.isNotEmpty);
+                      return Column(
+                        children: [
+                          ListTile(
+                            leading: Container(
+                              padding: const EdgeInsets.all(AppTheme.spacingS),
+                              decoration: BoxDecoration(
+                                color: hasAccess 
+                                    ? AppTheme.successColor.withOpacity(0.1)
+                                    : Colors.orange.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                              ),
+                              child: Icon(
+                                hasAccess 
+                                    ? Icons.directions_bus_rounded
+                                    : Icons.lock_outline_rounded,
+                                color: hasAccess 
+                                    ? AppTheme.successColor
+                                    : Colors.orange,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              bus.name,
+                              style: theme.textTheme.bodyLarge?.copyWith(
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                            subtitle: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  '${bus.time} • ${bus.totalSeats} seats',
+                                  style: theme.textTheme.bodySmall,
+                                ),
+                                if (hasAccess && bus.allowedSeats.isNotEmpty)
+                                  Text(
+                                    'Allowed: ${bus.allowedSeats.map((s) => s.toString()).join(', ')}',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.blue.shade700,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                                if (!hasAccess)
+                                  Text(
+                                    'No access - Request to book',
+                                    style: theme.textTheme.bodySmall?.copyWith(
+                                      color: Colors.orange.shade700,
+                                      fontSize: 11,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            trailing: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              crossAxisAlignment: CrossAxisAlignment.end,
+                              children: [
+                                Text(
+                                  'Rs. ${NumberFormat('#,##0').format(bus.price)}',
+                                  style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: AppTheme.primaryColor,
+                                  ),
+                                ),
+                                if (!hasAccess)
+                                  TextButton(
+                                    onPressed: () {
+                                      context.go('/counter/request-bus-access?busId=${bus.id}');
+                                    },
+                                    style: TextButton.styleFrom(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      minimumSize: Size.zero,
+                                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    ),
+                                    child: Text(
+                                      'Request',
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: Colors.orange.shade700,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            onTap: () {
+                              context.go('/buses/${bus.id}');
+                            },
+                          ),
+                        ],
                       );
                     }).toList(),
                   ),
@@ -421,23 +589,34 @@ class _QuickActionsSection extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              'Quick Actions',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              children: [
+    final theme = Theme.of(context);
+    return EnhancedCard(
+      padding: const EdgeInsets.all(AppTheme.spacingL),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Icon(
+                Icons.flash_on_rounded,
+                color: AppTheme.primaryColor,
+                size: 24,
+              ),
+              const SizedBox(width: AppTheme.spacingS),
+              Text(
+                'Quick Actions',
+                style: theme.textTheme.titleLarge?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: AppTheme.spacingL),
+          Wrap(
+            spacing: AppTheme.spacingM,
+            runSpacing: AppTheme.spacingM,
+            children: [
                 _QuickActionButton(
                   icon: Icons.add_circle_outline,
                   label: 'New Booking',
@@ -445,10 +624,16 @@ class _QuickActionsSection extends StatelessWidget {
                   onTap: () => context.go('/bookings/create'),
                 ),
                 _QuickActionButton(
-                  icon: Icons.directions_bus,
-                  label: 'Add Bus',
+                  icon: Icons.request_quote,
+                  label: 'Request Bus Access',
                   color: Colors.green,
-                  onTap: () => context.go('/buses/create'),
+                  onTap: () => context.go('/counter/request-bus-access'),
+                ),
+                _QuickActionButton(
+                  icon: Icons.list_alt,
+                  label: 'My Requests',
+                  color: Colors.cyan,
+                  onTap: () => context.go('/counter/requests'),
                 ),
                 _QuickActionButton(
                   icon: Icons.person_add,
@@ -490,7 +675,7 @@ class _QuickActionsSection extends StatelessWidget {
             ),
           ],
         ),
-      ),
+      
     );
   }
 }
@@ -512,28 +697,43 @@ class _QuickActionButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(12),
+      borderRadius: BorderRadius.circular(AppTheme.radiusM),
       child: Container(
-        width: 100,
-        padding: const EdgeInsets.all(12),
+        width: 110,
+        padding: const EdgeInsets.symmetric(
+          horizontal: AppTheme.spacingM,
+          vertical: AppTheme.spacingM,
+        ),
         decoration: BoxDecoration(
-          color: color.withOpacity(0.1),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withOpacity(0.3)),
+          color: color.withOpacity(0.08),
+          borderRadius: BorderRadius.circular(AppTheme.radiusM),
+          border: Border.all(
+            color: color.withOpacity(0.2),
+            width: 1.5,
+          ),
         ),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 32),
-            const SizedBox(height: 8),
+            Container(
+              padding: const EdgeInsets.all(AppTheme.spacingS),
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(AppTheme.radiusS),
+              ),
+              child: Icon(icon, color: color, size: 28),
+            ),
+            const SizedBox(height: AppTheme.spacingS),
             Text(
               label,
               textAlign: TextAlign.center,
-              style: TextStyle(
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
                 color: color,
+                fontWeight: FontWeight.w600,
                 fontSize: 12,
-                fontWeight: FontWeight.w500,
               ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
             ),
           ],
         ),

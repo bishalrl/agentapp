@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/usecases/signup.dart';
 import 'events/signup_event.dart';
 import 'states/signup_state.dart';
@@ -27,8 +28,10 @@ class SignupBloc extends Bloc<SignupEvent, SignupState> {
     print('   State emitted: isLoading=true');
 
     final result = await signup(
+      type: event.type,
       agencyName: event.agencyName,
       ownerName: event.ownerName,
+      name: event.name,
       address: event.address,
       districtProvince: event.districtProvince,
       primaryContact: event.primaryContact,
@@ -43,6 +46,7 @@ class SignupBloc extends Bloc<SignupEvent, SignupState> {
       password: event.password,
       citizenshipFile: event.citizenshipFile,
       photoFile: event.photoFile,
+      nameMatchImage: event.nameMatchImage,
       panVatNumber: event.panVatNumber,
       alternateContact: event.alternateContact,
       whatsappViber: event.whatsappViber,
@@ -58,31 +62,8 @@ class SignupBloc extends Bloc<SignupEvent, SignupState> {
       print('   Error Message: ${failure.message}');
       print('   Full Error: $error');
       
-      // Provide user-friendly error message
-      String errorMessage;
-      if (failure is NetworkFailure) {
-        // Provide user-friendly network error messages
-        final message = failure.message.toLowerCase();
-        if (message.contains('no route to host') || 
-            message.contains('connection refused') ||
-            message.contains('failed host lookup')) {
-          errorMessage = 'Unable to connect to server. Please check:\n'
-              '1. Your device and server are on the same network\n'
-              '2. The server is running and accessible\n'
-              '3. The server IP address in settings is correct\n'
-              '4. Firewall is not blocking the connection';
-        } else if (message.contains('timeout')) {
-          errorMessage = 'Connection timeout. Please check your internet connection and try again.';
-        } else if (message.contains('no internet')) {
-          errorMessage = 'No internet connection. Please check your network settings.';
-        } else {
-          errorMessage = 'Network error: ${failure.message}. Please check your internet connection and try again.';
-        }
-      } else if (failure is ServerFailure) {
-        errorMessage = failure.message.isEmpty ? 'Server error occurred. Please try again later.' : failure.message;
-      } else {
-        errorMessage = failure.message.isEmpty ? 'An unknown error occurred' : failure.message;
-      }
+      // Use centralized error sanitizer to prevent exposing backend errors
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       
       emit(state.copyWith(
         isLoading: false,
