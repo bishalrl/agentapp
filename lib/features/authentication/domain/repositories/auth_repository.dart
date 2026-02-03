@@ -3,27 +3,24 @@ import '../entities/auth_entity.dart';
 import 'dart:io';
 
 abstract class AuthRepository {
-  Future<Result<AuthEntity>> login(String email, String password, {String loginType = 'counter'});
+  Future<Result<AuthEntity>> login(String email, String password);
   Future<Result<AuthEntity>> signup({
-    required String type,
     required String agencyName,
     required String ownerName,
-    String? name,
     required String address,
     required String districtProvince,
     required String primaryContact,
     required String email,
-    String? officeLocation,
-    String? officeOpenTime,
-    String? officeCloseTime,
-    int? numberOfEmployees,
-    bool? hasDeviceAccess,
-    bool? hasInternetAccess,
-    String? preferredBookingMethod,
+    required String officeLocation,
+    required String officeOpenTime,
+    required String officeCloseTime,
+    required int numberOfEmployees,
+    required bool hasDeviceAccess,
+    required bool hasInternetAccess,
+    required String preferredBookingMethod,
     required String password,
     required File citizenshipFile,
     required File photoFile,
-    File? nameMatchImage,
     String? panVatNumber,
     String? alternateContact,
     String? whatsappViber,

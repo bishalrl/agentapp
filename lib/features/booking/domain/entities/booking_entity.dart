@@ -60,7 +60,7 @@ class BusInfoEntity {
   // New backend fields for enhanced seat access management
   final int? allowedSeatsCount; // Number of allowed seats
   final bool? hasRestrictedAccess; // true if counter has limited seats
-  final bool? hasFullAccess; // true if counter can book all seats
+  final bool? requiresWallet; // true if wallet pre-funding is required for booking
   final bool? hasNoAccess; // true if counter has no access
   final List<int>? availableAllowedSeats; // Seats that are BOTH allowed AND available
   final int? availableAllowedSeatsCount; // Count of available allowed seats
@@ -85,7 +85,7 @@ class BusInfoEntity {
     this.hasAccess,
     this.allowedSeatsCount,
     this.hasRestrictedAccess,
-    this.hasFullAccess,
+    this.requiresWallet,
     this.hasNoAccess,
     this.availableAllowedSeats,
     this.availableAllowedSeatsCount,

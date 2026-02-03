@@ -653,11 +653,14 @@ class BusRemoteDataSourceImpl implements BusRemoteDataSource {
               ?? busItem['bus'] as Map<String, dynamic>?
               ?? busItem;
           
-          // Merge accessId and allowedSeats from top level into bus data
+          // Merge accessId, allowedSeats, and new fields from top level into bus data
           final mergedBusData = <String, dynamic>{
             ...busData,
             if (busItem['accessId'] != null) 'accessId': busItem['accessId'],
             if (busItem['allowedSeats'] != null) 'allowedSeats': busItem['allowedSeats'],
+            if (busItem['requiresWallet'] != null) 'requiresWallet': busItem['requiresWallet'],
+            if (busItem['hasNoAccess'] != null) 'hasNoAccess': busItem['hasNoAccess'],
+            if (busItem['hasAccess'] != null) 'hasAccess': busItem['hasAccess'],
             if (busItem['commissionEarned'] != null) 'commissionEarned': busItem['commissionEarned'],
             if (busItem['totalBookings'] != null) 'totalBookings': busItem['totalBookings'],
           };
@@ -748,21 +751,26 @@ class BusRemoteDataSourceImpl implements BusRemoteDataSource {
           throw ServerException('Invalid bus data format in response');
         }
         
-        // Extract hasAccess if present (for new format)
+        // Extract new fields if present (for new format)
         final hasAccess = data['hasAccess'] as bool?;
+        final requiresWallet = data['requiresWallet'] as bool?;
+        final hasNoAccess = data['hasNoAccess'] as bool?;
         final accessMessage = data['message'] as String?;
         
         print('   ✅ Parsing bus data with ${busData.keys.length} fields');
         print('   HasAccess: $hasAccess');
+        print('   RequiresWallet: $requiresWallet');
+        print('   HasNoAccess: $hasNoAccess');
         if (accessMessage != null) {
           print('   Message: $accessMessage');
         }
         
-        // Merge hasAccess info into bus data if available
+        // Merge new fields into bus data if available
         final mergedBusData = <String, dynamic>{
           ...busData,
-          // Store hasAccess in a way that can be accessed later if needed
-          // For now, we'll use accessId presence to determine access
+          if (hasAccess != null) 'hasAccess': hasAccess,
+          if (requiresWallet != null) 'requiresWallet': requiresWallet,
+          if (hasNoAccess != null) 'hasNoAccess': hasNoAccess,
           // If hasAccess is false, ensure accessId is null
           if (hasAccess == false && busData['accessId'] == null) 
             'accessId': null,

@@ -194,7 +194,7 @@ class BusInfoModel extends BusInfoEntity {
     super.hasAccess,
     super.allowedSeatsCount,
     super.hasRestrictedAccess,
-    super.hasFullAccess,
+    super.requiresWallet,
     super.hasNoAccess,
     super.availableAllowedSeats,
     super.availableAllowedSeatsCount,
@@ -322,7 +322,7 @@ class BusInfoModel extends BusInfoEntity {
       // New backend fields for enhanced seat access management
       allowedSeatsCount: _parseToInt(json['allowedSeatsCount']),
       hasRestrictedAccess: json['hasRestrictedAccess'] as bool?,
-      hasFullAccess: json['hasFullAccess'] as bool?,
+      requiresWallet: json['requiresWallet'] as bool?,
       hasNoAccess: json['hasNoAccess'] as bool?,
       availableAllowedSeats: (json['availableAllowedSeats'] as List<dynamic>?)
           ?.map<int>((e) {

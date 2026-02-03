@@ -9,7 +9,6 @@ import '../../../../core/widgets/error_snackbar.dart';
 import '../../../../core/widgets/enhanced_card.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/injection/injection.dart' as di;
-import '../../../../core/utils/user_type_helper.dart';
 import '../../domain/entities/booking_entity.dart';
 
 class CreateBookingPage extends StatefulWidget {
@@ -32,22 +31,6 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
   String _selectedPaymentMethod = 'cash';
   List<dynamic> _selectedSeats = []; // Supports both int (legacy) and String (new format)
   int _bagCount = 0;
-  bool _isBetaAgent = false;
-  bool _isLoadingUserType = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkUserType();
-  }
-
-  Future<void> _checkUserType() async {
-    final isBetaAgent = await UserTypeHelper.isBetaAgent();
-    setState(() {
-      _isBetaAgent = isBetaAgent;
-      _isLoadingUserType = false;
-    });
-  }
   
   @override
   void dispose() {
@@ -62,14 +45,6 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
 
   @override
   Widget build(BuildContext context) {
-    // Show loading while checking user type
-    if (_isLoadingUserType) {
-      return Scaffold(
-        appBar: AppBar(title: const Text('Create Booking')),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
     return BlocProvider(
       // Use a fresh BookingBloc instance from DI to avoid using a closed bloc
       create: (context) => di.sl<BookingBloc>()..add(const GetAvailableBusesEvent()),
@@ -185,7 +160,6 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                         _SeatSelectionSection(
                           bus: state.selectedBus!,
                           selectedSeats: _selectedSeats,
-                          isBetaAgent: _isBetaAgent,
                           onSeatsChanged: (seats) {
                             setState(() {
                               _selectedSeats = seats;
@@ -304,15 +278,48 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
     // Validate seat access before API call
     final selectedBus = state.selectedBus;
     if (selectedBus != null) {
-      // Check if counter has no access
+      // Check if counter has no access - redirect to wallet or request access
       if (selectedBus.hasNoAccess == true || selectedBus.hasAccess == false) {
         ScaffoldMessenger.of(context).showSnackBar(
           ErrorSnackBar(
-            message: selectedBus.hasAccess == false
-                ? 'You do not have access to this bus. Please request access first.'
-                : 'You do not have permission to book seats on this bus.',
+            message: 'You do not have access to this bus. Please add money to wallet or request access.',
           ),
         );
+        // Show dialog to redirect to wallet or request access
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('No Access'),
+                content: const Text(
+                  'You do not have access to book seats on this bus. '
+                  'Would you like to add money to your wallet or request access?',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      context.pop();
+                      context.go('/wallet');
+                    },
+                    child: const Text('Add to Wallet'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      context.pop();
+                      context.go('/counter/request-bus-access?busId=${selectedBus.id}');
+                    },
+                    child: const Text('Request Access'),
+                  ),
+                ],
+              ),
+            );
+          }
+        });
         return;
       }
 
@@ -351,9 +358,8 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
         return str;
       }).where((seat) => seat != null).toList();
 
-      // Beta agents can book ANY seat - bypass all restrictions
-      // Check if counter has restricted access and validate selected seats (only for non-beta agents)
-      if (!_isBetaAgent && selectedBus.hasRestrictedAccess == true) {
+      // Check if counter has restricted access and validate selected seats
+      if (selectedBus.hasRestrictedAccess == true) {
         // First, validate against allowedSeats
         if (selectedBus.allowedSeats != null && selectedBus.allowedSeats!.isNotEmpty) {
           // Find seats that are not in allowedSeats
@@ -384,9 +390,38 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
             final notAllowedStr = notAllowedSeats.map((s) => s.toString()).join(', ');
             ScaffoldMessenger.of(context).showSnackBar(
               ErrorSnackBar(
-                message: 'You are not allowed to book seat(s): $notAllowedStr. You can only book: $allowedSeatsStr',
+                message: 'You are not allowed to book seat(s): $notAllowedStr. Add money to wallet to book these seats.',
               ),
             );
+            // Redirect to wallet for seats not in allowed list
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Seat Access Required'),
+                    content: Text(
+                      'You are not allowed to book seat(s): $notAllowedStr.\n\n'
+                      'You can only book: $allowedSeatsStr\n\n'
+                      'To book other seats, please add money to your wallet.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => context.pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          context.pop();
+                          context.go('/wallet');
+                        },
+                        child: const Text('Go to Wallet'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            });
             return;
           }
         }
@@ -435,6 +470,43 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
           );
           return;
         }
+      }
+
+      // Check if bus requires wallet and redirect if needed
+      if (selectedBus.requiresWallet == true) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          ErrorSnackBar(
+            message: 'This bus requires wallet balance. Please add money to your wallet first.',
+          ),
+        );
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Wallet Required'),
+                content: const Text(
+                  'This bus requires wallet balance to make bookings. '
+                  'Please add money to your wallet first.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      context.pop();
+                      context.go('/wallet');
+                    },
+                    child: const Text('Go to Wallet'),
+                  ),
+                ],
+              ),
+            );
+          }
+        });
+        return;
       }
     }
 
@@ -681,7 +753,6 @@ class _SeatSelectionSection extends StatelessWidget {
   final Function(List<dynamic>) onSeatsChanged;
   final Function(List<dynamic>) onLockSeats;
   final Function(List<dynamic>) onUnlockSeats;
-  final bool isBetaAgent;
 
   const _SeatSelectionSection({
     required this.bus,
@@ -689,7 +760,6 @@ class _SeatSelectionSection extends StatelessWidget {
     required this.onSeatsChanged,
     required this.onLockSeats,
     required this.onUnlockSeats,
-    required this.isBetaAgent,
   });
 
   @override
@@ -720,7 +790,7 @@ class _SeatSelectionSection extends StatelessWidget {
     print('   Allowed Seats: ${bus.allowedSeats}');
     print('   Allowed Seats Count: ${bus.allowedSeatsCount}');
     print('   Has Restricted Access: ${bus.hasRestrictedAccess}');
-    print('   Has Full Access: ${bus.hasFullAccess}');
+    print('   Requires Wallet: ${bus.requiresWallet}');
     print('   Has No Access: ${bus.hasNoAccess}');
     print('   Available Allowed Seats: ${bus.availableAllowedSeats}');
     print('   Available Allowed Seats Count: ${bus.availableAllowedSeatsCount}');
@@ -758,8 +828,7 @@ class _SeatSelectionSection extends StatelessWidget {
           ),
           const SizedBox(height: AppTheme.spacingL),
           // Show access status info based on backend flags
-          // Show restricted access warning only for non-beta agents
-          if (!isBetaAgent && bus.hasRestrictedAccess == true) ...[
+          if (bus.hasRestrictedAccess == true) ...[
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
@@ -833,7 +902,7 @@ class _SeatSelectionSection extends StatelessWidget {
               ),
             ),
             const SizedBox(height: AppTheme.spacingM),
-          ] else if (bus.hasFullAccess == true) ...[
+          ] else if (bus.hasAccess == true && bus.requiresWallet != true) ...[
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
@@ -867,7 +936,6 @@ class _SeatSelectionSection extends StatelessWidget {
             bookedSeats: bookedSeats,
             lockedSeats: lockedSeats,
             selectedSeats: selectedSeats,
-            isBetaAgent: isBetaAgent,
             onSeatTapped: (seatIdentifier) {
               final newSeats = List<dynamic>.from(selectedSeats);
               // Use proper comparison for both int and String
@@ -978,8 +1046,6 @@ class _SeatMap extends StatelessWidget {
   final List<dynamic> lockedSeats; // Supports both int and String
   final List<dynamic> selectedSeats; // Supports both int and String
   final Function(dynamic) onSeatTapped; // Accepts both int and String
-  final bool isBetaAgent;
-
   const _SeatMap({
     required this.bus,
     required this.totalSeats,
@@ -988,7 +1054,6 @@ class _SeatMap extends StatelessWidget {
     required this.lockedSeats,
     required this.selectedSeats,
     required this.onSeatTapped,
-    required this.isBetaAgent,
   });
 
   @override
@@ -1004,9 +1069,8 @@ class _SeatMap extends StatelessWidget {
     
     // Filter seats based on counter access permissions - only show allowed seats
     // Note: We show all allowed seats (even if booked/locked) but disable selection
-    // Beta agents can see ALL seats - bypass restrictions
     // This gives better UX - user can see what seats they have access to
-    if (!isBetaAgent && bus.hasRestrictedAccess == true) {
+    if (bus.hasRestrictedAccess == true) {
       // Counter has restricted access - only show allowed seats
       if (bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty) {
         seatIdentifiers = seatIdentifiers.where((seatIdentifier) {
@@ -1031,8 +1095,8 @@ class _SeatMap extends StatelessWidget {
     } else if (bus.hasNoAccess == true || bus.hasAccess == false) {
       // Counter has no access - show no seats
       seatIdentifiers = [];
-    } else if (bus.hasFullAccess == true) {
-      // Counter has full access - show all seats (no filtering needed)
+    } else if (bus.hasAccess == true && bus.requiresWallet != true) {
+      // Counter has access - show all seats (no filtering needed)
       // seatIdentifiers remains unchanged
     } else {
       // Fallback: check allowedSeats if flag not available
@@ -1212,10 +1276,7 @@ class _SeatMap extends StatelessWidget {
                   bool isSeatSelectable = true;
                   
                   // Check if seat is in availableAllowedSeats (seats that are BOTH allowed AND available)
-                  // Beta agents can select ANY seat (if not booked/locked)
-                  if (isBetaAgent) {
-                    isSeatSelectable = !isBooked && !isLocked;
-                  } else if (bus.hasRestrictedAccess == true && 
+                  if (bus.hasRestrictedAccess == true && 
                       bus.availableAllowedSeats != null && 
                       bus.availableAllowedSeats!.isNotEmpty) {
                     // Only seats in availableAllowedSeats can be selected
@@ -1233,8 +1294,8 @@ class _SeatMap extends StatelessWidget {
                     }
                   } else if (bus.hasNoAccess == true) {
                     isSeatSelectable = false;
-                  } else if (bus.hasFullAccess == true) {
-                    // Full access - seat is selectable if not booked/locked
+                  } else if (bus.hasAccess == true && bus.requiresWallet != true) {
+                    // Has access - seat is selectable if not booked/locked
                     isSeatSelectable = !isBooked && !isLocked;
                   } else {
                     // Fallback: check if seat is allowed (for backward compatibility)

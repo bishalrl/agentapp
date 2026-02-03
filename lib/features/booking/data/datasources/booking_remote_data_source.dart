@@ -129,7 +129,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
         final allowedSeats = data['allowedSeats'] as List<dynamic>?;
         final allowedSeatsCount = data['allowedSeatsCount'] as int?;
         final hasRestrictedAccess = data['hasRestrictedAccess'] as bool?;
-        final hasFullAccess = data['hasFullAccess'] as bool?;
+        final requiresWallet = data['requiresWallet'] as bool?;
         final hasNoAccess = data['hasNoAccess'] as bool?;
         final availableAllowedSeats = data['availableAllowedSeats'] as List<dynamic>?;
         final availableAllowedSeatsCount = data['availableAllowedSeatsCount'] as int?;
@@ -142,7 +142,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
         print('      HasAccess: $hasAccess');
         print('      AllowedSeats: $allowedSeats');
         print('      HasRestrictedAccess: $hasRestrictedAccess');
-        print('      HasFullAccess: $hasFullAccess');
+        print('      RequiresWallet: $requiresWallet');
         print('      HasNoAccess: $hasNoAccess');
         print('      AvailableAllowedSeats: $availableAllowedSeats');
         if (message != null) {
@@ -161,7 +161,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
           if (allowedSeats != null) 'allowedSeats': allowedSeats,
           if (allowedSeatsCount != null) 'allowedSeatsCount': allowedSeatsCount,
           if (hasRestrictedAccess != null) 'hasRestrictedAccess': hasRestrictedAccess,
-          if (hasFullAccess != null) 'hasFullAccess': hasFullAccess,
+          if (requiresWallet != null) 'requiresWallet': requiresWallet,
           if (hasNoAccess != null) 'hasNoAccess': hasNoAccess,
           if (availableAllowedSeats != null) 'availableAllowedSeats': availableAllowedSeats,
           if (availableAllowedSeatsCount != null) 'availableAllowedSeatsCount': availableAllowedSeatsCount,

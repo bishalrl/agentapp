@@ -472,9 +472,66 @@ class _BusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final busName = bus['name'] as String? ?? 'Unknown Bus';
     final vehicleNumber = bus['vehicleNumber'] as String? ?? 'N/A';
+    
+    // Try multiple ways to get route information (aligned with backend fix)
     final route = bus['route'] as Map<String, dynamic>?;
-    final routeDisplay = route?['display'] as String? ??
-        '${bus['from'] as String? ?? ''} to ${bus['to'] as String? ?? ''}';
+    String routeDisplay = 'N/A';
+    
+    // Method 1: Check if route has a display field (preferred - formatted string from backend)
+    if (route != null) {
+      if (route['display'] != null && route['display'].toString().isNotEmpty) {
+        final display = route['display'].toString();
+        // Skip if display is "null to null" or similar invalid formats
+        if (!display.toLowerCase().contains('null') && display != 'N/A') {
+          routeDisplay = display;
+        }
+      }
+      
+      // Method 2: Check for routeName (new backend field)
+      if ((routeDisplay == 'N/A' || routeDisplay.isEmpty) && route['routeName'] != null) {
+        final routeName = route['routeName'].toString();
+        if (routeName.isNotEmpty && routeName != 'null') {
+          routeDisplay = routeName;
+        }
+      }
+      
+      // Method 3: Build from route object's from/to
+      if ((routeDisplay == 'N/A' || routeDisplay.isEmpty) && 
+          route['from'] != null && route['to'] != null) {
+        final routeFrom = route['from'] is Map<String, dynamic> 
+            ? (route['from'] as Map<String, dynamic>)['name']?.toString() ?? route['from'].toString()
+            : route['from'].toString();
+        final routeTo = route['to'] is Map<String, dynamic>
+            ? (route['to'] as Map<String, dynamic>)['name']?.toString() ?? route['to'].toString()
+            : route['to'].toString();
+        
+        // Only use if both are valid (not null/empty)
+        if (routeFrom.isNotEmpty && routeFrom != 'null' && 
+            routeTo.isNotEmpty && routeTo != 'null') {
+          routeDisplay = '$routeFrom → $routeTo';
+        }
+      }
+    }
+    
+    // Method 4: Fallback to bus's direct from/to fields
+    if (routeDisplay == 'N/A' || routeDisplay.isEmpty) {
+      final from = bus['from'] as String?;
+      final to = bus['to'] as String?;
+      if (from != null && from.isNotEmpty && from != 'null' && 
+          to != null && to.isNotEmpty && to != 'null') {
+        routeDisplay = '$from → $to';
+      } else if (from != null && from.isNotEmpty && from != 'null') {
+        routeDisplay = from;
+      } else if (to != null && to.isNotEmpty && to != 'null') {
+        routeDisplay = to;
+      }
+    }
+    
+    // Final fallback: Show N/A if still empty
+    if (routeDisplay.isEmpty || routeDisplay == 'null') {
+      routeDisplay = 'N/A';
+    }
+    
     final date = bus['date'] as String?;
     final time = bus['time'] as String?;
     final arrival = bus['arrival'] as String?;
@@ -793,8 +850,32 @@ class _PendingRequestCard extends StatelessWidget {
                      request['_id'] as String? ?? '';
     final busId = request['busId'] as Map<String, dynamic>?;
     final vehicleNumber = busId?['vehicleNumber'] as String? ?? 'N/A';
-    final from = busId?['from'] as String? ?? '';
-    final to = busId?['to'] as String? ?? '';
+    
+    // Enhanced route extraction (aligned with backend fix)
+    String from = busId?['from'] as String? ?? '';
+    String to = busId?['to'] as String? ?? '';
+    
+    // Try to get route from bus route object if from/to are missing
+    final busRoute = busId?['route'] as Map<String, dynamic>?;
+    if ((from.isEmpty || from == 'null') && busRoute != null) {
+      if (busRoute['from'] != null) {
+        from = busRoute['from'] is Map<String, dynamic>
+            ? (busRoute['from'] as Map<String, dynamic>)['name']?.toString() ?? busRoute['from'].toString()
+            : busRoute['from'].toString();
+      }
+    }
+    if ((to.isEmpty || to == 'null') && busRoute != null) {
+      if (busRoute['to'] != null) {
+        to = busRoute['to'] is Map<String, dynamic>
+            ? (busRoute['to'] as Map<String, dynamic>)['name']?.toString() ?? busRoute['to'].toString()
+            : busRoute['to'].toString();
+      }
+    }
+    
+    // Build route display
+    final routeDisplay = (from.isNotEmpty && from != 'null' && to.isNotEmpty && to != 'null')
+        ? '$from → $to'
+        : (busRoute?['display']?.toString() ?? busRoute?['routeName']?.toString() ?? 'N/A');
     final requestedBy = request['requestedBy'] as Map<String, dynamic>?;
     final requesterName = requestedBy?['name'] as String? ?? 'Unknown';
     final requesterEmail = requestedBy?['email'] as String?;
@@ -967,7 +1048,7 @@ class _PendingRequestCard extends StatelessWidget {
           _InfoRow(
             icon: Icons.route,
             label: 'Route',
-            value: '$from → $to',
+            value: routeDisplay,
           ),
           if (expiresAt != null) ...[
             _InfoRow(

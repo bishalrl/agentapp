@@ -24,11 +24,18 @@ class BookingListPage extends StatefulWidget {
 class _BookingListPageState extends State<BookingListPage> {
   String? _selectedDateFilter; // 'today', 'yesterday', 'all', or custom date string
   bool _hasLoadedInitialData = false;
+  bool _isInitializing = true;
 
   @override
   void initState() {
     super.initState();
     _selectedDateFilter = 'all';
+  }
+  
+  @override
+  void dispose() {
+    _isInitializing = false;
+    super.dispose();
   }
 
   String? _getDateForFilter() {
@@ -92,10 +99,21 @@ class _BookingListPageState extends State<BookingListPage> {
     }
     
     // Trigger the event to load bookings only once on initial load
-    if (!_hasLoadedInitialData) {
+    // Only load if bookings are empty (not already loaded)
+    if (!_hasLoadedInitialData && _isInitializing) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _hasLoadedInitialData = true;
-        bookingBloc!.add(GetBookingsEvent(date: _getDateForFilter()));
+        if (!mounted) return;
+        // Check if bookings are already loaded before making API call
+        final currentState = bookingBloc!.state;
+        if (currentState.bookings.isEmpty && !currentState.isLoading) {
+          _hasLoadedInitialData = true;
+          _isInitializing = false;
+          bookingBloc.add(GetBookingsEvent(date: _getDateForFilter()));
+        } else {
+          // Bookings already loaded or loading, just mark as loaded
+          _hasLoadedInitialData = true;
+          _isInitializing = false;
+        }
       });
     }
     
@@ -155,7 +173,10 @@ class _BookingListPageState extends State<BookingListPage> {
                         setState(() {
                           _selectedDateFilter = 'all';
                         });
-                        // No API call needed - we filter on frontend
+                        // Reload bookings if empty to ensure we have data
+                        if (context.read<BookingBloc>().state.bookings.isEmpty) {
+                          context.read<BookingBloc>().add(const GetBookingsEvent());
+                        }
                       },
                     ),
                     const SizedBox(width: 8),
@@ -166,7 +187,10 @@ class _BookingListPageState extends State<BookingListPage> {
                         setState(() {
                           _selectedDateFilter = 'today';
                         });
-                        // No API call needed - we filter on frontend
+                        // Reload bookings if empty to ensure we have data
+                        if (context.read<BookingBloc>().state.bookings.isEmpty) {
+                          context.read<BookingBloc>().add(const GetBookingsEvent());
+                        }
                       },
                     ),
                     const SizedBox(width: 8),
@@ -177,7 +201,10 @@ class _BookingListPageState extends State<BookingListPage> {
                         setState(() {
                           _selectedDateFilter = 'yesterday';
                         });
-                        // No API call needed - we filter on frontend
+                        // Reload bookings if empty to ensure we have data
+                        if (context.read<BookingBloc>().state.bookings.isEmpty) {
+                          context.read<BookingBloc>().add(const GetBookingsEvent());
+                        }
                       },
                     ),
                   ],
@@ -213,7 +240,9 @@ class _BookingListPageState extends State<BookingListPage> {
             }
           },
           builder: (context, state) {
-            if (state.isLoading) {
+            // Only show loading if bookings are empty (initial load)
+            // If bookings exist, show them even if loading (for better UX)
+            if (state.isLoading && state.bookings.isEmpty) {
               return const Center(child: CircularProgressIndicator());
             }
 
@@ -547,42 +576,43 @@ class _BookingListPageState extends State<BookingListPage> {
             padding: EdgeInsets.only(
               bottom: MediaQuery.of(context).viewInsets.bottom,
             ),
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            child: SingleChildScrollView(
+              child: Container(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
                     Text(
                       'Filter Bookings',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
                             fontWeight: FontWeight.bold,
                           ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.close),
-                      onPressed: () => Navigator.pop(context),
+                        IconButton(
+                          icon: const Icon(Icons.close),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ],
                     ),
-                  ],
-                ),
-                const SizedBox(height: 20),
-                // Date Filter Section
-                Text(
-                  'Date',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                ),
-                const SizedBox(height: 12),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: [
-                    _DialogFilterChip(
+                    const SizedBox(height: 20),
+                    // Date Filter Section
+                    Text(
+                      'Date',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: [
+                        _DialogFilterChip(
                       label: 'All',
                       selected: tempDateFilter == 'all',
                       onTap: () {
@@ -635,130 +665,131 @@ class _BookingListPageState extends State<BookingListPage> {
                     ),
                   ],
                 ),
-                if (tempDateFilter != null &&
-                    tempDateFilter != 'all' &&
-                    tempDateFilter != 'today' &&
-                    tempDateFilter != 'yesterday' &&
-                    selectedCustomDate != null) ...[
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: AppTheme.primaryColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
+                    if (tempDateFilter != null &&
+                        tempDateFilter != 'all' &&
+                        tempDateFilter != 'today' &&
+                        tempDateFilter != 'yesterday' &&
+                        selectedCustomDate != null) ...[
+                      const SizedBox(height: 8),
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: AppTheme.primaryColor.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.calendar_today, size: 16, color: AppTheme.primaryColor),
+                            const SizedBox(width: 8),
+                            Text(
+                              DateFormat('MMM d, y').format(selectedCustomDate!),
+                              style: TextStyle(
+                                color: AppTheme.primaryColor,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    // Status Filter
+                    Text(
+                      'Status',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
                     ),
-                    child: Row(
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: statusController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g., confirmed, cancelled, pending',
+                        prefixIcon: const Icon(Icons.filter_alt),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    // Payment Method Filter
+                    Text(
+                      'Payment Method',
+                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                            fontWeight: FontWeight.w600,
+                            color: Colors.grey[700],
+                          ),
+                    ),
+                    const SizedBox(height: 8),
+                    TextField(
+                      controller: paymentMethodController,
+                      decoration: InputDecoration(
+                        hintText: 'e.g., cash, online',
+                        prefixIcon: const Icon(Icons.payment),
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        filled: true,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    // Action Buttons
+                    Row(
                       children: [
-                        Icon(Icons.calendar_today, size: 16, color: AppTheme.primaryColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          DateFormat('MMM d, y').format(selectedCustomDate!),
-                          style: TextStyle(
-                            color: AppTheme.primaryColor,
-                            fontWeight: FontWeight.w500,
+                        Expanded(
+                          child: OutlinedButton(
+                            onPressed: () {
+                              setState(() {
+                                _selectedDateFilter = 'all';
+                              });
+                              Navigator.pop(context);
+                              // Only refresh if status or payment method filters are applied
+                              if (statusController.text.isNotEmpty || paymentMethodController.text.isNotEmpty) {
+                                context.read<BookingBloc>().add(const GetBookingsEvent());
+                              }
+                            },
+                            child: const Text('Reset'),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          flex: 2,
+                          child: ElevatedButton(
+                            onPressed: () {
+                              final hasStatusFilter = statusController.text.isNotEmpty;
+                              final hasPaymentFilter = paymentMethodController.text.isNotEmpty;
+                              final isCustomDate = tempDateFilter != null &&
+                                  tempDateFilter != 'all' &&
+                                  tempDateFilter != 'today' &&
+                                  tempDateFilter != 'yesterday';
+                              
+                              setState(() {
+                                _selectedDateFilter = tempDateFilter;
+                              });
+                              Navigator.pop(context);
+                              
+                              // Only make API call if status/payment filters or custom date is selected
+                              // For today/yesterday/all, we filter on frontend
+                              if (hasStatusFilter || hasPaymentFilter || isCustomDate) {
+                                context.read<BookingBloc>().add(
+                                      GetBookingsEvent(
+                                        date: isCustomDate ? tempDateFilter : null,
+                                        status: hasStatusFilter ? statusController.text : null,
+                                        paymentMethod: hasPaymentFilter ? paymentMethodController.text : null,
+                                      ),
+                                    );
+                              }
+                            },
+                            child: const Text('Apply Filters'),
                           ),
                         ),
                       ],
                     ),
-                  ),
-                ],
-                const SizedBox(height: 24),
-                // Status Filter
-                Text(
-                  'Status',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: statusController,
-                  decoration: InputDecoration(
-                    hintText: 'e.g., confirmed, cancelled, pending',
-                    prefixIcon: const Icon(Icons.filter_alt),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Payment Method Filter
-                Text(
-                  'Payment Method',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.w600,
-                        color: Colors.grey[700],
-                      ),
-                ),
-                const SizedBox(height: 8),
-                TextField(
-                  controller: paymentMethodController,
-                  decoration: InputDecoration(
-                    hintText: 'e.g., cash, online',
-                    prefixIcon: const Icon(Icons.payment),
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    filled: true,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                // Action Buttons
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton(
-                        onPressed: () {
-                          setState(() {
-                            _selectedDateFilter = 'all';
-                          });
-                          Navigator.pop(context);
-                          // Only refresh if status or payment method filters are applied
-                          if (statusController.text.isNotEmpty || paymentMethodController.text.isNotEmpty) {
-                            context.read<BookingBloc>().add(const GetBookingsEvent());
-                          }
-                        },
-                        child: const Text('Reset'),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      flex: 2,
-                      child: ElevatedButton(
-                        onPressed: () {
-                          final hasStatusFilter = statusController.text.isNotEmpty;
-                          final hasPaymentFilter = paymentMethodController.text.isNotEmpty;
-                          final isCustomDate = tempDateFilter != null &&
-                              tempDateFilter != 'all' &&
-                              tempDateFilter != 'today' &&
-                              tempDateFilter != 'yesterday';
-                          
-                          setState(() {
-                            _selectedDateFilter = tempDateFilter;
-                          });
-                          Navigator.pop(context);
-                          
-                          // Only make API call if status/payment filters or custom date is selected
-                          // For today/yesterday/all, we filter on frontend
-                          if (hasStatusFilter || hasPaymentFilter || isCustomDate) {
-                            context.read<BookingBloc>().add(
-                                  GetBookingsEvent(
-                                    date: isCustomDate ? tempDateFilter : null,
-                                    status: hasStatusFilter ? statusController.text : null,
-                                    paymentMethod: hasPaymentFilter ? paymentMethodController.text : null,
-                                  ),
-                                );
-                          }
-                        },
-                        child: const Text('Apply Filters'),
-                      ),
-                    ),
                   ],
                 ),
-              ],
-            ),
+              ),
             ),
           ),
         ),

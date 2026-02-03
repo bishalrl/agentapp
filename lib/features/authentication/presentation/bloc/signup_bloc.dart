@@ -1,6 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
-import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/usecases/signup.dart';
 import 'events/signup_event.dart';
@@ -28,10 +27,8 @@ class SignupBloc extends Bloc<SignupEvent, SignupState> {
     print('   State emitted: isLoading=true');
 
     final result = await signup(
-      type: event.type,
       agencyName: event.agencyName,
       ownerName: event.ownerName,
-      name: event.name,
       address: event.address,
       districtProvince: event.districtProvince,
       primaryContact: event.primaryContact,
@@ -46,7 +43,6 @@ class SignupBloc extends Bloc<SignupEvent, SignupState> {
       password: event.password,
       citizenshipFile: event.citizenshipFile,
       photoFile: event.photoFile,
-      nameMatchImage: event.nameMatchImage,
       panVatNumber: event.panVatNumber,
       alternateContact: event.alternateContact,
       whatsappViber: event.whatsappViber,

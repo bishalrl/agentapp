@@ -21,25 +21,22 @@ class AuthRepositoryImpl implements AuthRepository {
 
   @override
   Future<Result<AuthEntity>> signup({
-    required String type,
     required String agencyName,
     required String ownerName,
-    String? name,
     required String address,
     required String districtProvince,
     required String primaryContact,
     required String email,
-    String? officeLocation,
-    String? officeOpenTime,
-    String? officeCloseTime,
-    int? numberOfEmployees,
-    bool? hasDeviceAccess,
-    bool? hasInternetAccess,
-    String? preferredBookingMethod,
+    required String officeLocation,
+    required String officeOpenTime,
+    required String officeCloseTime,
+    required int numberOfEmployees,
+    required bool hasDeviceAccess,
+    required bool hasInternetAccess,
+    required String preferredBookingMethod,
     required String password,
     required File citizenshipFile,
     required File photoFile,
-    File? nameMatchImage,
     String? panVatNumber,
     String? alternateContact,
     String? whatsappViber,
@@ -52,10 +49,8 @@ class AuthRepositoryImpl implements AuthRepository {
           print('📦 AuthRepositoryImpl.signup: Calling remoteDataSource');
           // Signup returns model with empty token - account needs admin verification
           final auth = await remoteDataSource.signup(
-            type: type,
             agencyName: agencyName,
             ownerName: ownerName,
-            name: name,
             address: address,
             districtProvince: districtProvince,
             primaryContact: primaryContact,
@@ -70,7 +65,6 @@ class AuthRepositoryImpl implements AuthRepository {
             password: password,
             citizenshipFile: citizenshipFile,
             photoFile: photoFile,
-            nameMatchImage: nameMatchImage,
             panVatNumber: panVatNumber,
             alternateContact: alternateContact,
             whatsappViber: whatsappViber,
@@ -105,11 +99,10 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Result<AuthEntity>> login(String email, String password, {String loginType = 'counter'}) async {
+  Future<Result<AuthEntity>> login(String email, String password) async {
     try {
       print('📦 AuthRepositoryImpl.login: Starting login process');
       print('   Email: $email');
-      print('   LoginType: $loginType');
       if (await networkInfo.isConnected) {
         print('   ✅ Network connected, calling remoteDataSource');
         try {
@@ -117,9 +110,9 @@ class AuthRepositoryImpl implements AuthRepository {
           print('   ✅ AuthRepositoryImpl.login: Remote login successful');
           print('   Token length: ${auth.token.length}');
           await localDataSource.saveToken(auth.token);
-          // Save the session type based on loginType parameter
-          await localDataSource.saveSessionType(loginType);
-          print('   ✅ Token & session type ($loginType) saved to local storage');
+          // All counters are the same now (no beta agent distinction)
+          await localDataSource.saveSessionType('counter');
+          print('   ✅ Token & session type (counter) saved to local storage');
           return Success(auth);
         } on NetworkException catch (e) {
           print('   ❌ AuthRepositoryImpl.login: NetworkException');

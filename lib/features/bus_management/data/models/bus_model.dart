@@ -28,6 +28,10 @@ class BusModel extends BusEntity {
     super.ownerEmail,
     super.accessId,
     super.allowedSeats,
+    super.requiresWallet,
+    super.hasNoAccess,
+    super.hasAccess,
+    super.hasRestrictedAccess,
     super.seatConfiguration,
     super.amenities,
     super.boardingPoints,
@@ -192,6 +196,10 @@ class BusModel extends BusEntity {
           })
           .whereType<int>()
           .toList(),
+      requiresWallet: json['requiresWallet'] as bool?,
+      hasNoAccess: json['hasNoAccess'] as bool?,
+      hasAccess: json['hasAccess'] as bool?,
+      hasRestrictedAccess: json['hasRestrictedAccess'] as bool?,
       seatConfiguration: (json['seatConfiguration'] as List<dynamic>?)
           ?.map((e) => e.toString())
           .toList(),

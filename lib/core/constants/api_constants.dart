@@ -2,16 +2,22 @@ class ApiConstants {
   // Base URLs
   // ⚠️ IMPORTANT: Update this to your actual server IP address
   // For local development, use: http://YOUR_IP_ADDRESS:5000/api
-  // Example: http://192.168.1.100:5000/api
   // To find your IP: Windows (ipconfig) or Mac/Linux (ifconfig)
   
-  // Production URL
-  static const String baseUrl ='http://147.93.152.80:5000/api';// 'http://192.168.1.68:5000/api
+  // Development/Testing (Local Network)
+  // Backend Server IP: 192.168.1.68
+  // Backend Server Port: 5000
+  static const String baseUrl = 'http://192.168.1.68:5000/api';
   
   // Development URLs (for local testing)
-  static const String devBaseUrl ='http://147.93.152.80:5000/api';//'http://192.168.1.64:5000/api';// 'http://192.168.1.68:5000/api';
-  //'http://192.168.1.66:5000/api';//room ko ip 
-  //'http://192.168.254.13:5000/api';//office ko ip
+  static const String devBaseUrl = 'http://192.168.1.68:5000/api';
+  
+  // Production (Update when deployed)
+  // static const String baseUrl = 'https://your-production-domain.com/api';
+  
+  // Localhost (for emulator)
+  // static const String baseUrl = 'http://10.0.2.2:5000/api'; // Android emulator
+  // static const String baseUrl = 'http://localhost:5000/api'; // iOS simulator
   
   // API Endpoints
   static const String driverInvite = '/driver/invite';
@@ -146,6 +152,6 @@ class ApiConstants {
   // Timeouts
   static const int connectTimeout = 30000; // 30 seconds
   static const int receiveTimeout = 30000; // 30 seconds
-  static const int multipartTimeout = 120000; // 120 seconds (2 minutes) for file uploads
+  static const int multipartTimeout = 300000; // 300 seconds (5 minutes) for large file uploads (registration with images)
 }
 

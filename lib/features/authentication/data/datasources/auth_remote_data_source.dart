@@ -12,25 +12,22 @@ abstract class AuthRemoteDataSource {
   Future<void> forgotPassword(String email);
   Future<void> resetPassword(String token, String newPassword);
   Future<AuthModel> signup({
-    required String type,
     required String agencyName,
     required String ownerName,
-    String? name,
     required String address,
     required String districtProvince,
     required String primaryContact,
     required String email,
-    String? officeLocation,
-    String? officeOpenTime,
-    String? officeCloseTime,
-    int? numberOfEmployees,
-    bool? hasDeviceAccess,
-    bool? hasInternetAccess,
-    String? preferredBookingMethod,
+    required String officeLocation,
+    required String officeOpenTime,
+    required String officeCloseTime,
+    required int numberOfEmployees,
+    required bool hasDeviceAccess,
+    required bool hasInternetAccess,
+    required String preferredBookingMethod,
     required String password,
     required File citizenshipFile,
     required File photoFile,
-    File? nameMatchImage,
     String? panVatNumber,
     String? alternateContact,
     String? whatsappViber,
@@ -262,25 +259,22 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
   @override
   Future<AuthModel> signup({
-    required String type,
     required String agencyName,
     required String ownerName,
-    String? name,
     required String address,
     required String districtProvince,
     required String primaryContact,
     required String email,
-    String? officeLocation,
-    String? officeOpenTime,
-    String? officeCloseTime,
-    int? numberOfEmployees,
-    bool? hasDeviceAccess,
-    bool? hasInternetAccess,
-    String? preferredBookingMethod,
+    required String officeLocation,
+    required String officeOpenTime,
+    required String officeCloseTime,
+    required int numberOfEmployees,
+    required bool hasDeviceAccess,
+    required bool hasInternetAccess,
+    required String preferredBookingMethod,
     required String password,
     required File citizenshipFile,
     required File photoFile,
-    File? nameMatchImage,
     String? panVatNumber,
     String? alternateContact,
     String? whatsappViber,
@@ -290,46 +284,21 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     try {
       // Prepare form fields
       final fields = <String, String>{
-        'type': type, // 'counter' or 'betaAgent'
         'agencyName': agencyName,
         'ownerName': ownerName,
         'address': address,
         'districtProvince': districtProvince,
         'primaryContact': primaryContact,
         'email': email,
+        'officeLocation': officeLocation,
+        'officeOpenTime': officeOpenTime,
+        'officeCloseTime': officeCloseTime,
+        'numberOfEmployees': numberOfEmployees.toString(),
+        'hasDeviceAccess': hasDeviceAccess.toString(),
+        'hasInternetAccess': hasInternetAccess.toString(),
+        'preferredBookingMethod': preferredBookingMethod,
         'password': password,
       };
-
-      // Add type-specific fields
-      if (type == 'betaAgent') {
-        // Beta Agent fields
-        if (name != null && name.isNotEmpty) {
-          fields['name'] = name;
-        }
-      } else {
-        // Counter fields
-        if (officeLocation != null && officeLocation.isNotEmpty) {
-          fields['officeLocation'] = officeLocation;
-        }
-        if (officeOpenTime != null && officeOpenTime.isNotEmpty) {
-          fields['officeOpenTime'] = officeOpenTime;
-        }
-        if (officeCloseTime != null && officeCloseTime.isNotEmpty) {
-          fields['officeCloseTime'] = officeCloseTime;
-        }
-        if (numberOfEmployees != null) {
-          fields['numberOfEmployees'] = numberOfEmployees.toString();
-        }
-        if (hasDeviceAccess != null) {
-          fields['hasDeviceAccess'] = hasDeviceAccess.toString();
-        }
-        if (hasInternetAccess != null) {
-          fields['hasInternetAccess'] = hasInternetAccess.toString();
-        }
-        if (preferredBookingMethod != null && preferredBookingMethod.isNotEmpty) {
-          fields['preferredBookingMethod'] = preferredBookingMethod;
-        }
-      }
 
       // Add optional fields
       if (panVatNumber != null && panVatNumber.isNotEmpty) {
@@ -347,11 +316,6 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'citizenshipFile': citizenshipFile,
         'photoFile': photoFile,
       };
-
-      // Add nameMatchImage for Beta Agent
-      if (nameMatchImage != null) {
-        files['nameMatchImage'] = nameMatchImage;
-      }
 
       if (panFile != null) {
         files['panFile'] = panFile;

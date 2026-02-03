@@ -23,6 +23,7 @@ class CounterEntity {
     required this.email,
     required this.phoneNumber,
     required this.walletBalance,
+
   });
 }
 

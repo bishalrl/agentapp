@@ -24,6 +24,10 @@ class BusEntity {
   final String? ownerEmail;
   final String? accessId; // Counter bus access ID (if counter has access to this bus)
   final List<int>? allowedSeats;
+  final bool? requiresWallet; // true if wallet pre-funding is required for booking
+  final bool? hasNoAccess; // true if counter has no access to this bus
+  final bool? hasAccess; // true if counter has access (for bus details endpoint)
+  final bool? hasRestrictedAccess; // true if counter has limited seats (restricted access)
   final List<String>? seatConfiguration; // Custom seat identifiers (Nepal standard: A/B only, e.g., ["A1", "A4", "B6"])
   final List<String>? amenities; // Bus amenities (e.g., ["WiFi", "AC", "TV"])
   final List<Map<String, String>>? boardingPoints; // Boarding points with location and time
@@ -76,6 +80,10 @@ class BusEntity {
     this.ownerEmail,
     this.accessId,
     this.allowedSeats,
+    this.requiresWallet,
+    this.hasNoAccess,
+    this.hasAccess,
+    this.hasRestrictedAccess,
     this.seatConfiguration,
     this.amenities,
     this.boardingPoints,

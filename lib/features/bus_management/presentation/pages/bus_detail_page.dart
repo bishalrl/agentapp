@@ -5,7 +5,6 @@ import '../../../../core/widgets/error_snackbar.dart';
 import '../../../../core/widgets/enhanced_card.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/injection/injection.dart' as di;
-import '../../../../core/utils/user_type_helper.dart';
 import '../../domain/entities/bus_entity.dart';
 import '../bloc/bus_bloc.dart';
 import '../bloc/events/bus_event.dart';
@@ -24,44 +23,8 @@ class BusDetailPage extends StatefulWidget {
 }
 
 class _BusDetailPageState extends State<BusDetailPage> {
-  bool _isBetaAgent = false;
-  bool _isLoadingUserType = true;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkUserType();
-  }
-
-  Future<void> _checkUserType() async {
-    final isBetaAgent = await UserTypeHelper.isBetaAgent();
-    setState(() {
-      _isBetaAgent = isBetaAgent;
-      _isLoadingUserType = false;
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
-    // Show loading while checking user type
-    if (_isLoadingUserType) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('Bus Details'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/buses');
-              }
-            },
-          ),
-        ),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
 
     // Get BusBloc from context or create new one
     BusBloc? busBloc;
@@ -130,16 +93,7 @@ class _BusDetailPageState extends State<BusDetailPage> {
                 },
               ),
               actions: [
-                // Only show edit for legacy "my buses" (buses without accessId)
-                // Beta agents have read-only access - they can view but not edit/delete
-                if (!_isBetaAgent && bus.accessId == null)
-                  IconButton(
-                    icon: const Icon(Icons.edit),
-                    onPressed: () {
-                      context.go('/buses/${bus.id}/edit');
-                    },
-                    tooltip: 'Edit Bus',
-                  ),
+                // Edit bus functionality removed - counters can only request access to owner buses
               ],
             ),
             body: BlocConsumer<BusBloc, BusState>(
@@ -231,8 +185,7 @@ class _BusDetailPageState extends State<BusDetailPage> {
                               ),
                             ),
                             // Only show activate/deactivate for legacy "my buses" (without accessId)
-                            // Beta agents have read-only access - they cannot activate/deactivate buses
-                            if (!_isBetaAgent && currentBus.accessId == null)
+                            if (currentBus.accessId == null)
                               if (state.isLoading)
                                 const SizedBox(
                                   width: 20,
@@ -418,62 +371,8 @@ class _BusDetailPageState extends State<BusDetailPage> {
                           ),
                         ),
                       
-                      // Actions section - only for legacy "my buses" (without accessId)
-                      // Beta agents have read-only access - they can view bus details but cannot edit/delete
-                      if (!_isBetaAgent && currentBus.accessId == null)
-                        EnhancedCard(
-                          padding: const EdgeInsets.all(AppTheme.spacingL),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              ElevatedButton.icon(
-                                onPressed: () {
-                                  context.go('/buses/${currentBus.id}/edit');
-                                },
-                                icon: const Icon(Icons.edit_rounded),
-                                label: const Text('Edit Bus'),
-                              ),
-                              const SizedBox(height: AppTheme.spacingM),
-                              OutlinedButton.icon(
-                                onPressed: () {
-                                  _showDeleteDialog(context, currentBus);
-                                },
-                                icon: const Icon(Icons.delete_rounded, color: AppTheme.errorColor),
-                                label: const Text(
-                                  'Delete Bus',
-                                  style: TextStyle(color: AppTheme.errorColor),
-                                ),
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (_isBetaAgent)
-                        // Beta agents: Read-only access - can view details but cannot edit/delete
-                        EnhancedCard(
-                          padding: const EdgeInsets.all(AppTheme.spacingL),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.stretch,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(Icons.info_outline, color: AppTheme.primaryColor),
-                                  const SizedBox(width: AppTheme.spacingS),
-                                  Expanded(
-                                    child: Text(
-                                      'Beta Agent: Read-only access. You can view bus details and make bookings, but cannot edit or delete bus data.',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: AppTheme.textSecondary,
-                                        fontStyle: FontStyle.italic,
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ),
-                        )
-                      else if (currentBus.accessId == null && (currentBus.allowedSeats == null || currentBus.allowedSeats!.isEmpty))
-                        // No access - show request access button
+                      // Actions section - Edit bus functionality removed
+                      if (currentBus.allowedSeats == null || currentBus.allowedSeats!.isEmpty)
                         EnhancedCard(
                           padding: const EdgeInsets.all(AppTheme.spacingL),
                           child: Column(
@@ -498,6 +397,30 @@ class _BusDetailPageState extends State<BusDetailPage> {
                                 },
                                 icon: const Icon(Icons.request_quote),
                                 label: const Text('Request Bus Access'),
+                              ),
+                            ],
+                          ),
+                        )
+                      else
+                        EnhancedCard(
+                          padding: const EdgeInsets.all(AppTheme.spacingL),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.stretch,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(Icons.info_outline, color: AppTheme.primaryColor),
+                                  const SizedBox(width: AppTheme.spacingS),
+                                  Expanded(
+                                    child: Text(
+                                      'Read-only access. You can view bus details and make bookings, but cannot edit or delete bus data.',
+                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                        color: AppTheme.textSecondary,
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                  ),
+                                ],
                               ),
                             ],
                           ),
@@ -537,35 +460,6 @@ class _BusDetailPageState extends State<BusDetailPage> {
     );
   }
 
-  void _showDeleteDialog(BuildContext context, BusEntity bus) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Delete Bus'),
-        content: Text('Are you sure you want to delete "${bus.name}"? This action cannot be undone.'),
-        actions: [
-          TextButton(
-            onPressed: () => context.pop(),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () {
-              context.pop();
-              context.read<BusBloc>().add(DeleteBusEvent(busId: bus.id));
-              // Navigate back after deletion
-              Future.delayed(const Duration(milliseconds: 500), () {
-                if (context.mounted) {
-                  context.go('/buses');
-                }
-              });
-            },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
-            child: const Text('Delete'),
-          ),
-        ],
-      ),
-    );
-  }
 }
 
 class _InfoCard extends StatelessWidget {

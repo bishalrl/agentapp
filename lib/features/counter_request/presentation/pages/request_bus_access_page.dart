@@ -826,7 +826,7 @@ class _SeatSelectionCard extends StatelessWidget {
                 ],
               ),
             ),
-          ] else if (bus.hasFullAccess == true) ...[
+          ] else if (bus.hasAccess == true && bus.requiresWallet != true) ...[
             const SizedBox(height: AppTheme.spacingS),
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),

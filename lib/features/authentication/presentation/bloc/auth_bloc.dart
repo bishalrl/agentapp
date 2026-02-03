@@ -1,6 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
-import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/usecases/login.dart';
 import '../../domain/usecases/logout.dart';
@@ -34,7 +33,7 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     emit(state.copyWith(isLoading: true, errorMessage: null));
     print('   State emitted: isLoading=true');
 
-    final result = await login(event.email, event.password, loginType: event.loginType);
+    final result = await login(event.email, event.password);
 
     if (result is Error<AuthEntity>) {
       final failure = result.failure;

@@ -37,7 +37,6 @@ class _LoginPageViewState extends State<_LoginPageView> {
   final emailController = TextEditingController();
   final passwordController = TextEditingController();
   bool _isNavigating = false;
-  String loginType = 'counter'; // 'counter' or 'betaAgent'
 
   @override
   void dispose() {
@@ -119,15 +118,15 @@ class _LoginPageViewState extends State<_LoginPageView> {
                               color: AppTheme.surfaceColor,
                               shape: BoxShape.circle,
                             ),
-                            child: Icon(
-                              loginType == 'counter' ? Icons.business : Icons.person,
+                            child: const Icon(
+                              Icons.business,
                               size: 64,
                               color: AppTheme.primaryColor,
                             ),
                           ),
                           const SizedBox(height: 32),
                           Text(
-                            loginType == 'counter' ? 'Counter Login' : 'Beta Agent Login',
+                            'Counter Login',
                             style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                                   color: AppTheme.textPrimary,
                                   fontWeight: FontWeight.bold,
@@ -139,103 +138,6 @@ class _LoginPageViewState extends State<_LoginPageView> {
                             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                                   color: AppTheme.textSecondary,
                                 ),
-                          ),
-                          const SizedBox(height: 32),
-                          // Login Type Toggle
-                          Container(
-                            decoration: BoxDecoration(
-                              color: Colors.grey[100],
-                              borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.grey[300]!),
-                            ),
-                            child: Row(
-                              children: [
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () {
-                                      setState(() {
-                                        loginType = 'counter';
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      decoration: BoxDecoration(
-                                        color: loginType == 'counter'
-                                            ? Theme.of(context).colorScheme.primary
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.business_center,
-                                            color: loginType == 'counter'
-                                                ? Colors.white
-                                                : Colors.grey[600],
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Counter',
-                                            style: TextStyle(
-                                              color: loginType == 'counter'
-                                                  ? Colors.white
-                                                  : Colors.grey[600],
-                                              fontWeight: loginType == 'counter'
-                                                  ? FontWeight.bold
-                                                  : FontWeight.normal,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                                Expanded(
-                                  child: InkWell(
-                                    onTap: () {
-                                      setState(() {
-                                        loginType = 'betaAgent';
-                                      });
-                                    },
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 16),
-                                      decoration: BoxDecoration(
-                                        color: loginType == 'betaAgent'
-                                            ? Theme.of(context).colorScheme.primary
-                                            : Colors.transparent,
-                                        borderRadius: BorderRadius.circular(16),
-                                      ),
-                                      child: Row(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.person_outline,
-                                            color: loginType == 'betaAgent'
-                                                ? Colors.white
-                                                : Colors.grey[600],
-                                          ),
-                                          const SizedBox(width: 8),
-                                          Text(
-                                            'Beta Agent',
-                                            style: TextStyle(
-                                              color: loginType == 'betaAgent'
-                                                  ? Colors.white
-                                                  : Colors.grey[600],
-                                              fontWeight: loginType == 'betaAgent'
-                                                  ? FontWeight.bold
-                                                  : FontWeight.normal,
-                                              fontSize: 16,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ),
-                              ],
-                            ),
                           ),
                           const SizedBox(height: 32),
                           Card(
@@ -321,7 +223,6 @@ class _LoginPageViewState extends State<_LoginPageView> {
                                                       LoginEvent(
                                                         email: emailController.text,
                                                         password: passwordController.text,
-                                                        loginType: loginType,
                                                       ),
                                                     );
                                                     print('✅ LoginEvent added successfully');
