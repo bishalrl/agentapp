@@ -19,6 +19,7 @@ abstract class BookingRepository {
     String? luggage,
     int? bagCount,
     required String paymentMethod,
+    String? holdId, // Optional wallet hold ID
   });
   Future<Result<List<BookingEntity>>> getBookings({
     String? date,

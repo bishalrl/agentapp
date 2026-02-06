@@ -3,6 +3,7 @@ import 'package:agentapp/features/schedule_management/presentation/bloc/states/s
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/schedule_entity.dart';
 import '../../domain/usecases/create_schedule.dart';
 import '../../domain/usecases/get_schedules.dart';
@@ -44,12 +45,7 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
     );
     if (result is Error<List<ScheduleEntity>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(ScheduleError(errorMessage));
     } else if (result is Success<List<ScheduleEntity>>) {
       emit(SchedulesLoaded(result.data));
@@ -71,12 +67,7 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
     );
     if (result is Error<ScheduleEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(ScheduleError(errorMessage));
     } else if (result is Success<ScheduleEntity>) {
       emit(ScheduleCreated(result.data));
@@ -91,12 +82,7 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
     final result = await getScheduleById(event.scheduleId);
     if (result is Error<ScheduleEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(ScheduleError(errorMessage));
     } else if (result is Success<ScheduleEntity>) {
       emit(ScheduleLoaded(result.data));
@@ -117,12 +103,7 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
     );
     if (result is Error<ScheduleEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(ScheduleError(errorMessage));
     } else if (result is Success<ScheduleEntity>) {
       emit(ScheduleUpdated(result.data));
@@ -137,12 +118,7 @@ class ScheduleBloc extends Bloc<ScheduleEvent, ScheduleState> {
     final result = await deleteSchedule(event.scheduleId);
     if (result is Error<void>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(ScheduleError(errorMessage));
     } else if (result is Success<void>) {
       emit(ScheduleDeleted());

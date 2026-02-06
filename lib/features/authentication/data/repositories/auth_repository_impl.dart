@@ -2,6 +2,7 @@ import 'dart:io';
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../../../core/utils/network_info.dart';
 import '../../domain/entities/auth_entity.dart';
 import '../../domain/repositories/auth_repository.dart';
@@ -86,7 +87,7 @@ class AuthRepositoryImpl implements AuthRepository {
         } on ServerException catch (e) {
           print('   ❌ AuthRepositoryImpl.signup: ServerException caught');
           print('   Error message: ${e.message}');
-          final failure = ServerFailure(e.message.isEmpty ? 'Unknown server error' : e.message);
+          final failure = ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message.isEmpty ? 'Unknown server error' : e.message));
           print('   Returning Error with message: ${failure.message}');
           return Error(failure);
         }
@@ -94,7 +95,7 @@ class AuthRepositoryImpl implements AuthRepository {
         return const Error(NetworkFailure('No internet connection'));
       }
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -125,7 +126,7 @@ class AuthRepositoryImpl implements AuthRepository {
         } on ServerException catch (e) {
           print('   ❌ AuthRepositoryImpl.login: ServerException');
           print('   Error: ${e.message}');
-          return Error(ServerFailure(e.message));
+          return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
         }
       } else {
         print('   ❌ AuthRepositoryImpl.login: No network connection');
@@ -135,7 +136,7 @@ class AuthRepositoryImpl implements AuthRepository {
       print('   ❌ AuthRepositoryImpl.login: Unexpected error');
       print('   Error: $e');
       print('   StackTrace: $stackTrace');
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -151,14 +152,14 @@ class AuthRepositoryImpl implements AuthRepository {
         } on ServerException catch (e) {
           print('   ❌ AuthRepositoryImpl.changePassword: ServerException caught');
           print('   Error message: ${e.message}');
-          return Error(ServerFailure(e.message.isEmpty ? 'Failed to change password' : e.message));
+          return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message.isEmpty ? 'Failed to change password' : e.message)));
         }
       } else {
         return const Error(NetworkFailure('No internet connection'));
       }
     } catch (e) {
       print('   ❌ AuthRepositoryImpl.changePassword: Unexpected error: $e');
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -178,14 +179,14 @@ class AuthRepositoryImpl implements AuthRepository {
         } on ServerException catch (e) {
           print('   ❌ AuthRepositoryImpl.forgotPassword: ServerException');
           print('   Error: ${e.message}');
-          return Error(ServerFailure(e.message));
+          return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
         }
       } else {
         return const Error(NetworkFailure('No internet connection'));
       }
     } catch (e) {
       print('   ❌ AuthRepositoryImpl.forgotPassword: Unexpected error: $e');
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -205,14 +206,14 @@ class AuthRepositoryImpl implements AuthRepository {
         } on ServerException catch (e) {
           print('   ❌ AuthRepositoryImpl.resetPassword: ServerException');
           print('   Error: ${e.message}');
-          return Error(ServerFailure(e.message));
+          return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
         }
       } else {
         return const Error(NetworkFailure('No internet connection'));
       }
     } catch (e) {
       print('   ❌ AuthRepositoryImpl.resetPassword: Unexpected error: $e');
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/app_theme.dart';
 
 class ErrorSnackBar extends SnackBar {
   ErrorSnackBar({
@@ -66,7 +67,7 @@ class ErrorSnackBar extends SnackBar {
               ],
             ],
           ),
-          backgroundColor: Colors.red[600],
+          backgroundColor: AppTheme.errorColor,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(
@@ -101,7 +102,7 @@ class SuccessSnackBar extends SnackBar {
               ),
             ],
           ),
-          backgroundColor: Colors.green[600],
+          backgroundColor: AppTheme.successColor,
           behavior: SnackBarBehavior.floating,
           margin: const EdgeInsets.all(16),
           shape: RoundedRectangleBorder(

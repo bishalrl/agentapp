@@ -1,6 +1,7 @@
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../../../core/session/session_manager.dart';
 import '../../../../features/authentication/domain/usecases/get_stored_token.dart';
 import '../../domain/entities/counter_request_entity.dart';
@@ -67,10 +68,10 @@ class CounterRequestRepositoryImpl implements CounterRequestRepository {
       return Error(NetworkFailure(e.message));
     } on ServerException catch (e) {
       print('   ❌ ServerException: ${e.message}');
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
       print('   ❌ Unexpected error: ${e.toString()}');
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -104,10 +105,10 @@ class CounterRequestRepositoryImpl implements CounterRequestRepository {
       return Error(NetworkFailure(e.message));
     } on ServerException catch (e) {
       print('   ❌ ServerException: ${e.message}');
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
       print('   ❌ Unexpected error: ${e.toString()}');
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 }

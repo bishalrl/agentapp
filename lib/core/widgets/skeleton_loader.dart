@@ -66,9 +66,9 @@ class _SkeletonLoaderState extends State<SkeletonLoader>
                 _animation.value + 0.3,
               ].map((stop) => stop.clamp(0.0, 1.0)).toList(),
               colors: [
-                widget.baseColor ?? Colors.grey[300]!,
-                widget.highlightColor ?? Colors.grey[100]!,
-                widget.baseColor ?? Colors.grey[300]!,
+                widget.baseColor ?? AppTheme.lightBorderColor,
+                widget.highlightColor ?? AppTheme.surfaceColor,
+                widget.baseColor ?? AppTheme.lightBorderColor,
               ],
             ),
           ),

@@ -1,6 +1,6 @@
 class AppConstants {
   // App Info
-  static const String appName = 'Neelo Sewa Agent';
+  static const String appName = 'Tejbi Agent';
   static const String appVersion = '1.0.0';
   
   // Storage Keys

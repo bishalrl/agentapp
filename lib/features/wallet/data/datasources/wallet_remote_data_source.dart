@@ -52,7 +52,7 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException('Failed to add money: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 
@@ -82,7 +82,21 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
       );
 
       if (response['success'] == true && response['data'] != null) {
-        final transactions = response['data']['transactions'] as List<dynamic>;
+        final data = response['data'];
+        List<dynamic> transactions;
+        
+        // Handle different response structures
+        if (data is List) {
+          // If data is directly a list of transactions
+          transactions = data;
+        } else if (data is Map && data.containsKey('transactions')) {
+          // If data is a map with 'transactions' key
+          transactions = data['transactions'] as List<dynamic>? ?? [];
+        } else {
+          // Fallback: try to get transactions from data
+          transactions = [];
+        }
+        
         return transactions
             .map((t) => WalletTransactionModel.fromJson(t as Map<String, dynamic>))
             .toList();
@@ -92,7 +106,7 @@ class WalletRemoteDataSourceImpl implements WalletRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException('Failed to get transactions: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 }

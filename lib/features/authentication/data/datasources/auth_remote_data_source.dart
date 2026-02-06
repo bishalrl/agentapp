@@ -146,7 +146,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       print('   ❌ AuthRemoteDataSource.login: Unexpected error');
       print('   Error: $e');
       print('   StackTrace: $stackTrace');
-      throw ServerException('Failed to login: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 
@@ -183,7 +183,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e, stackTrace) {
       print('   ❌ Unexpected error in AuthRemoteDataSource: $e');
       print('   StackTrace: $stackTrace');
-      throw ServerException('[AuthRemoteDataSource] Failed to change password: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 
@@ -218,7 +218,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e, stackTrace) {
       print('   ❌ Unexpected error in AuthRemoteDataSource.forgotPassword: $e');
       print('   StackTrace: $stackTrace');
-      throw ServerException('[AuthRemoteDataSource] Failed to send password reset email: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 
@@ -253,7 +253,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     } catch (e, stackTrace) {
       print('   ❌ Unexpected error in AuthRemoteDataSource.resetPassword: $e');
       print('   StackTrace: $stackTrace');
-      throw ServerException('[AuthRemoteDataSource] Failed to reset password: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 
@@ -381,7 +381,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
           errorStr.contains('connection refused')) {
         throw NetworkException('Network error: ${e.toString()}');
       }
-      throw ServerException('[AuthRemoteDataSource] Failed to signup: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 }

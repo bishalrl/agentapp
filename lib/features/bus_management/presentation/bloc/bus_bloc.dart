@@ -147,12 +147,7 @@ class BusBloc extends Bloc<BusEvent, BusState> {
 
     if (result is Error<BusEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<BusEntity>) {
       final updatedBus = result.data;
@@ -178,12 +173,7 @@ class BusBloc extends Bloc<BusEvent, BusState> {
 
     if (result is Error<void>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<void>) {
       final updatedBuses = state.buses.where((bus) => bus.id != event.busId).toList();
@@ -368,12 +358,7 @@ class BusBloc extends Bloc<BusEvent, BusState> {
 
     if (result is Error<BusEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<BusEntity>) {
       final activatedBus = result.data;
@@ -399,12 +384,7 @@ class BusBloc extends Bloc<BusEvent, BusState> {
 
     if (result is Error<BusEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<BusEntity>) {
       final deactivatedBus = result.data;

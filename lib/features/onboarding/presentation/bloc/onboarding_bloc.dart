@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/usecases/get_onboarding_status.dart';
 import '../../domain/usecases/complete_onboarding.dart';
 import '../../domain/entities/onboarding_entity.dart';
@@ -30,9 +31,10 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
     
     if (result is Error<OnboardingEntity>) {
       print('   ❌ GetOnboardingStatus Error: ${result.failure.message}');
+      final errorMessage = ErrorMessageSanitizer.sanitize(result.failure);
       emit(state.copyWith(
         isLoading: false,
-        errorMessage: result.failure.message,
+        errorMessage: errorMessage,
       ));
     } else if (result is Success<OnboardingEntity>) {
       final onboarding = result.data;
@@ -61,9 +63,10 @@ class OnboardingBloc extends Bloc<OnboardingEvent, OnboardingState> {
     
     if (result is Error) {
       print('   ❌ CompleteOnboarding Error: ${result.failure.message}');
+      final errorMessage = ErrorMessageSanitizer.sanitize(result.failure);
       emit(state.copyWith(
         isLoading: false,
-        errorMessage: result.failure.message,
+        errorMessage: errorMessage,
       ));
     } else if (result is Success) {
       print('   ✅ CompleteOnboarding Success');

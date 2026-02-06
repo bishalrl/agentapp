@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/usecases/change_password.dart';
 import '../../domain/usecases/get_stored_token.dart';
 import 'events/change_password_event.dart';
@@ -64,9 +65,7 @@ class ChangePasswordBloc extends Bloc<ChangePasswordEvent, ChangePasswordState> 
 
     if (result is Error) {
       final error = result;
-      final errorMessage = error.failure.message.isEmpty 
-          ? 'Failed to change password' 
-          : error.failure.message;
+      final errorMessage = ErrorMessageSanitizer.sanitize(error.failure);
       print('   ❌ Change Password Error:');
       print('   Failure Type: ${error.failure.runtimeType}');
       print('   Error Message: $errorMessage');

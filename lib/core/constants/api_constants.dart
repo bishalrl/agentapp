@@ -7,10 +7,10 @@ class ApiConstants {
   // Development/Testing (Local Network)
   // Backend Server IP: 192.168.1.68
   // Backend Server Port: 5000
-  static const String baseUrl = 'http://192.168.1.68:5000/api';
+  static const String baseUrl = 'http://147.93.152.80:5000/api';
   
   // Development URLs (for local testing)
-  static const String devBaseUrl = 'http://192.168.1.68:5000/api';
+  static const String devBaseUrl = 'http://147.93.152.80:5000/api';
   
   // Production (Update when deployed)
   // static const String baseUrl = 'https://your-production-domain.com/api';
@@ -125,6 +125,13 @@ class ApiConstants {
   // Wallet Management
   static const String counterWalletAdd = '/counter/wallet/add';
   static const String counterWalletTransactions = '/counter/wallet/transactions';
+  
+  // Wallet Hold Management
+  static const String counterWalletHold = '/counter/wallet/hold';
+  static const String counterWalletHoldRelease = '/counter/wallet/hold'; // POST /:holdId/release
+  static const String counterWalletHoldConfirm = '/counter/wallet/hold'; // POST /:holdId/confirm
+  static const String counterWalletHolds = '/counter/wallet/holds'; // GET list
+  static const String counterWalletHoldGet = '/counter/wallet/hold'; // GET /:holdId
   
   // Notifications
   static const String counterNotifications = '/counter/notifications';

@@ -1,6 +1,7 @@
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/seat_lock_entity.dart';
 import '../../domain/repositories/seat_lock_repository.dart';
 import '../datasources/seat_lock_remote_data_source.dart';
@@ -23,9 +24,9 @@ class SeatLockRepositoryImpl implements SeatLockRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -41,9 +42,9 @@ class SeatLockRepositoryImpl implements SeatLockRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -59,9 +60,9 @@ class SeatLockRepositoryImpl implements SeatLockRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -77,9 +78,9 @@ class SeatLockRepositoryImpl implements SeatLockRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -95,9 +96,9 @@ class SeatLockRepositoryImpl implements SeatLockRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 }

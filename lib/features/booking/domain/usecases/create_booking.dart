@@ -18,6 +18,7 @@ class CreateBooking {
     String? luggage,
     int? bagCount,
     required String paymentMethod,
+    String? holdId, // Optional wallet hold ID
   }) async {
     return await repository.createBooking(
       busId: busId,
@@ -30,6 +31,7 @@ class CreateBooking {
       luggage: luggage,
       bagCount: bagCount,
       paymentMethod: paymentMethod,
+      holdId: holdId,
     );
   }
 }

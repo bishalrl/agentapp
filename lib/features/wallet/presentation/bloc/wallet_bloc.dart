@@ -3,6 +3,7 @@ import 'package:agentapp/features/wallet/presentation/bloc/states/wallet_state.d
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/wallet_entity.dart';
 import '../../domain/usecases/add_money.dart';
 import '../../domain/usecases/get_transactions.dart';
@@ -31,12 +32,7 @@ class WalletBloc extends Bloc<WalletEvent, WalletState> {
     );
     if (result is Error<WalletEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(WalletError(errorMessage));
     } else if (result is Success<WalletEntity>) {
       final wallet = result.data;
@@ -58,12 +54,7 @@ class WalletBloc extends Bloc<WalletEvent, WalletState> {
     );
     if (result is Error<List<WalletTransactionEntity>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(WalletError(errorMessage));
     } else if (result is Success<List<WalletTransactionEntity>>) {
       final transactions = result.data;

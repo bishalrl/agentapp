@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/widgets/skeleton_loader.dart';
 import '../../../../core/widgets/enhanced_card.dart';
+import '../../../../core/widgets/error_state_widget.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/injection/injection.dart' as di;
 import '../bloc/optimized_dashboard_bloc.dart';
@@ -60,24 +61,13 @@ class OptimizedDashboardPage extends StatelessWidget {
 
             // Error state (but still show cached data if available)
             if (state.errorMessage != null && state.dashboard == null) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                    const SizedBox(height: 16),
-                    Text(state.errorMessage!),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        context.read<OptimizedDashboardBloc>().add(
-                          const GetDashboardEvent(forceRefresh: true),
-                        );
-                      },
-                      child: const Text('Retry'),
-                    ),
-                  ],
-                ),
+              return ErrorStateWidget(
+                message: state.errorMessage!,
+                onRetry: () {
+                  context.read<OptimizedDashboardBloc>().add(
+                    const GetDashboardEvent(forceRefresh: true),
+                  );
+                },
               );
             }
 
@@ -136,18 +126,18 @@ class OptimizedDashboardPage extends StatelessWidget {
                 padding: const EdgeInsets.all(12),
                 margin: const EdgeInsets.only(bottom: 16),
                 decoration: BoxDecoration(
-                  color: Colors.orange.shade50,
+                  color: AppTheme.warningColor.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.orange.shade200),
+                  border: Border.all(color: AppTheme.warningColor.withOpacity(0.5)),
                 ),
                 child: Row(
                   children: [
-                    Icon(Icons.info_outline, color: Colors.orange.shade700),
+                    Icon(Icons.info_outline, color: AppTheme.warningColor),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         state.errorMessage!,
-                        style: TextStyle(color: Colors.orange.shade700),
+                        style: TextStyle(color: AppTheme.warningColor),
                       ),
                     ),
                   ],

@@ -45,7 +45,7 @@ class MyApp extends StatelessWidget {
         BlocProvider(create: (_) => di.sl<RouteBloc>()),
       ],
       child: MaterialApp.router(
-        title: 'Neelo Sewa Agent',
+        title: 'Tejbi Agent',
         theme: AppTheme.lightTheme,
         darkTheme: AppTheme.darkTheme,
         themeMode: ThemeMode.light,

@@ -1,6 +1,7 @@
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../../../core/session/session_manager.dart';
 import '../../domain/entities/dashboard_entity.dart';
 import '../../domain/repositories/dashboard_repository.dart';
@@ -98,7 +99,7 @@ class DashboardRepositoryImpl implements DashboardRepository {
       if (cachedDashboard != null) {
         return Success(cachedDashboard);
       }
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e, stackTrace) {
       print('   ❌ Unexpected error: $e');
       print('   StackTrace: $stackTrace');
@@ -106,7 +107,7 @@ class DashboardRepositoryImpl implements DashboardRepository {
       if (cachedDashboard != null) {
         return Success(cachedDashboard);
       }
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 }

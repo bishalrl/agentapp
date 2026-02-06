@@ -3,6 +3,7 @@ import 'package:agentapp/features/driver_management/presentation/bloc/states/dri
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/driver_entity.dart';
 import '../../domain/usecases/invite_driver.dart';
 import '../../domain/usecases/get_drivers.dart';
@@ -48,12 +49,7 @@ class DriverManagementBloc
     );
     if (result is Error<List<DriverEntity>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(DriverManagementError(errorMessage));
     } else if (result is Success<List<DriverEntity>>) {
       final drivers = result.data;
@@ -77,12 +73,7 @@ class DriverManagementBloc
     );
     if (result is Error<DriverEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(DriverManagementError(errorMessage));
     } else if (result is Success<DriverEntity>) {
       final driver = result.data;
@@ -98,12 +89,7 @@ class DriverManagementBloc
     final result = await getDriverById(event.driverId);
     if (result is Error<DriverEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(DriverManagementError(errorMessage));
     } else if (result is Success<DriverEntity>) {
       final driver = result.data;
@@ -122,12 +108,7 @@ class DriverManagementBloc
     );
     if (result is Error<DriverEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(DriverManagementError(errorMessage));
     } else if (result is Success<DriverEntity>) {
       final driver = result.data;
@@ -150,12 +131,7 @@ class DriverManagementBloc
     );
     if (result is Error<DriverEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(DriverManagementError(errorMessage));
     } else if (result is Success<DriverEntity>) {
       final driver = result.data;
@@ -171,12 +147,7 @@ class DriverManagementBloc
     final result = await deleteDriver(event.driverId);
     if (result is Error<void>) {
       final failure = (result as Error<void>).failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(DriverManagementError(errorMessage));
     } else if (result is Success<void>) {
       emit(DriverDeleted());

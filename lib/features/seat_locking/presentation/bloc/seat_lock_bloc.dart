@@ -1,5 +1,6 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/usecases/lock_seat.dart';
 import '../../domain/usecases/lock_multiple_seats.dart';
 import '../../domain/usecases/unlock_seat.dart';
@@ -36,7 +37,8 @@ class SeatLockBloc extends Bloc<SeatLockEvent, SeatLockState> {
 
     if (result is Error<SeatLockEntity>) {
       print('   ❌ LockSeat Error: ${result.failure.message}');
-      emit(state.copyWith(isLoading: false, errorMessage: result.failure.message));
+      final errorMessage = ErrorMessageSanitizer.sanitize(result.failure);
+      emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<SeatLockEntity>) {
       final newLock = result.data;
       print('   ✅ LockSeat Success: seat=${newLock.seatNumber} locked');
@@ -55,7 +57,8 @@ class SeatLockBloc extends Bloc<SeatLockEvent, SeatLockState> {
     final result = await lockMultipleSeats(event.busId, event.seatNumbers);
 
     if (result is Error<List<SeatLockEntity>>) {
-      emit(state.copyWith(isLoading: false, errorMessage: result.failure.message));
+      final errorMessage = ErrorMessageSanitizer.sanitize(result.failure);
+      emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<List<SeatLockEntity>>) {
       final newLocks = result.data;
       emit(state.copyWith(
@@ -72,7 +75,8 @@ class SeatLockBloc extends Bloc<SeatLockEvent, SeatLockState> {
     final result = await unlockSeat(event.busId, event.seatNumber);
 
     if (result is Error) {
-      emit(state.copyWith(isLoading: false, errorMessage: result.failure.message));
+      final errorMessage = ErrorMessageSanitizer.sanitize(result.failure);
+      emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success) {
       emit(state.copyWith(
         busLocks: state.busLocks.where((lock) => lock.seatNumber != event.seatNumber).toList(),
@@ -88,7 +92,8 @@ class SeatLockBloc extends Bloc<SeatLockEvent, SeatLockState> {
     final result = await getBusLocks(event.busId);
 
     if (result is Error<List<SeatLockEntity>>) {
-      emit(state.copyWith(isLoading: false, errorMessage: result.failure.message));
+      final errorMessage = ErrorMessageSanitizer.sanitize(result.failure);
+      emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<List<SeatLockEntity>>) {
       emit(state.copyWith(
         busLocks: result.data,

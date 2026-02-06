@@ -42,7 +42,7 @@ class SplashPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 24),
                   Text(
-                    'Neelo Sewa',
+                    'Tejbi',
                     style: Theme.of(context).textTheme.headlineLarge?.copyWith(
                           color: Colors.white,
                           fontWeight: FontWeight.bold,

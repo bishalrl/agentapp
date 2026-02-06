@@ -11,8 +11,10 @@ import '../../../../core/widgets/error_snackbar.dart';
 import '../../../../core/widgets/enhanced_card.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/main_drawer.dart';
-import '../../../../core/animations/scroll_animations.dart';
 import '../../../../core/animations/dialog_animations.dart';
+import '../../../authentication/presentation/bloc/auth_bloc.dart';
+import '../../../authentication/presentation/bloc/events/auth_event.dart';
+import '../../../authentication/presentation/bloc/states/auth_state.dart' as auth;
 
 class ProfilePage extends StatelessWidget {
   const ProfilePage({super.key});
@@ -184,6 +186,22 @@ class _ProfileView extends StatelessWidget {
                         );
                       },
                       child: _OfficeInfoSection(profile: profile),
+                    ),
+                    const SizedBox(height: AppTheme.spacingL),
+                    TweenAnimationBuilder<double>(
+                      tween: Tween<double>(begin: 0.0, end: 1.0),
+                      duration: const Duration(milliseconds: 500),
+                      curve: Curves.easeOutCubic,
+                      builder: (context, value, child) {
+                        return Opacity(
+                          opacity: value,
+                          child: Transform.translate(
+                            offset: Offset(0, 20 * (1 - value)),
+                            child: child,
+                          ),
+                        );
+                      },
+                      child: const _LogoutSection(),
                     ),
                   ],
                 ),
@@ -807,6 +825,83 @@ class _EditProfileDialogState extends State<_EditProfileDialog> {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LogoutSection extends StatelessWidget {
+  const _LogoutSection();
+
+  @override
+  Widget build(BuildContext context) {
+    return BlocListener<AuthBloc, auth.AuthState>(
+      listener: (context, state) {
+        if (state.isAuthenticated == false && state.isLoading == false) {
+          // Navigate to login after successful logout
+          context.go('/login');
+        }
+      },
+      child: EnhancedCard(
+        padding: const EdgeInsets.all(AppTheme.spacingL),
+        child: Column(
+          children: [
+            BlocBuilder<AuthBloc, auth.AuthState>(
+              builder: (context, authState) {
+                final isLoading = authState.isLoading;
+                return SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: isLoading
+                        ? null
+                        : () {
+                            // Show confirmation dialog
+                            showDialog(
+                              context: context,
+                              builder: (dialogContext) => AlertDialog(
+                                title: const Text('Logout'),
+                                content: const Text('Are you sure you want to logout?'),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.of(dialogContext).pop(),
+                                    child: const Text('Cancel'),
+                                  ),
+                                  ElevatedButton(
+                                    onPressed: () {
+                                      Navigator.of(dialogContext).pop();
+                                      context.read<AuthBloc>().add(const LogoutEvent());
+                                    },
+                                    style: ElevatedButton.styleFrom(
+                                      backgroundColor: AppTheme.errorColor,
+                                      foregroundColor: Colors.white,
+                                    ),
+                                    child: const Text('Logout'),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                    icon: isLoading
+                        ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Icon(Icons.logout, color: AppTheme.errorColor),
+                    label: Text(
+                      isLoading ? 'Logging out...' : 'Logout',
+                      style: const TextStyle(color: AppTheme.errorColor),
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      side: const BorderSide(color: AppTheme.errorColor, width: 1.5),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ],
         ),
       ),
     );

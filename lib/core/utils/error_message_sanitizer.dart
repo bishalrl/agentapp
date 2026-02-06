@@ -185,10 +185,34 @@ class ErrorMessageSanitizer {
     return 'Invalid input. Please check your information.';
   }
 
+  /// Sanitize raw server/API message without a Failure object (e.g. in repositories).
+  /// Use when creating ServerFailure so stored message is never backend/API text.
+  static String sanitizeRawServerMessage(String message) {
+    if (message.isEmpty) return getGenericErrorMessage();
+    return _sanitizeServerError(message);
+  }
+
   /// Check if message contains technical details that should be hidden
   static bool _containsTechnicalDetails(String message) {
     final lowerMessage = message.toLowerCase();
-    
+
+    // Internal/API/backend phrasing - never show to user
+    if (lowerMessage.contains('exception') ||
+        lowerMessage.contains('datasource') ||
+        lowerMessage.contains('repository') ||
+        lowerMessage.contains('remote_data_source') ||
+        lowerMessage.contains('api') ||
+        lowerMessage.contains('endpoint') ||
+        lowerMessage.contains('error at') ||
+        lowerMessage.contains('authremotedatasource') ||
+        lowerMessage.contains('serverexception') ||
+        lowerMessage.contains('e.tostring') ||
+        lowerMessage.contains('unexpected error:')) {
+      return true;
+    }
+    // "failed to" often prefixes internal/backend messages
+    if (lowerMessage.contains('failed to')) return true;
+
     // Check for common technical patterns
     return lowerMessage.contains('error:') ||
            lowerMessage.contains('exception:') ||

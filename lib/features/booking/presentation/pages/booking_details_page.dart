@@ -6,8 +6,11 @@ import '../bloc/booking_bloc.dart';
 import '../bloc/events/booking_event.dart';
 import '../bloc/states/booking_state.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/error_state_widget.dart';
+import '../../../../core/widgets/app_bar.dart';
 import '../../../../core/widgets/enhanced_card.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/back_button_handler.dart';
 import '../../domain/entities/booking_entity.dart';
 
 class BookingDetailsPage extends StatelessWidget {
@@ -19,19 +22,11 @@ class BookingDetailsPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => context.read<BookingBloc>()..add(GetBookingDetailsEvent(bookingId: bookingId)),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Booking Details'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/bookings');
-              }
-            },
-          ),
+      child: BackButtonHandler(
+        enableDoubleBackToExit: false,
+        child: Scaffold(
+        appBar: AppAppBar(
+          title: 'Booking Details',
           actions: [
             BlocBuilder<BookingBloc, BookingState>(
               builder: (context, state) {
@@ -76,34 +71,9 @@ class BookingDetailsPage extends StatelessWidget {
             }
 
             if (state.errorMessage != null && state.selectedBooking == null) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Text(
-                        state.errorMessage!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(color: Colors.red[700]),
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        context.read<BookingBloc>().add(GetBookingDetailsEvent(bookingId: bookingId));
-                      },
-                      child: const Text('Retry'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () => context.pop(),
-                      child: const Text('Go Back'),
-                    ),
-                  ],
-                ),
+              return ErrorStateWidget(
+                message: state.errorMessage!,
+                onRetry: () => context.read<BookingBloc>().add(GetBookingDetailsEvent(bookingId: bookingId)),
               );
             }
 
@@ -132,6 +102,7 @@ class BookingDetailsPage extends StatelessWidget {
           },
         ),
       ),
+        ),
     );
   }
 
@@ -153,7 +124,7 @@ class BookingDetailsPage extends StatelessWidget {
               context.pop();
               context.read<BookingBloc>().add(CancelBookingEvent(bookingId: booking.id));
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.red),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.errorColor),
             child: const Text('Yes, Cancel'),
           ),
         ],
@@ -188,7 +159,7 @@ class _BookingHeaderCard extends StatelessWidget {
         statusIcon = Icons.pending_rounded;
         break;
       default:
-        statusColor = Colors.grey;
+        statusColor = AppTheme.textSecondary;
         statusIcon = Icons.info_rounded;
     }
     
@@ -471,7 +442,7 @@ class _BookingStatusCard extends StatelessWidget {
         statusIcon = Icons.pending_rounded;
         break;
       default:
-        statusColor = Colors.grey;
+        statusColor = AppTheme.textSecondary;
         statusIcon = Icons.info_rounded;
     }
 

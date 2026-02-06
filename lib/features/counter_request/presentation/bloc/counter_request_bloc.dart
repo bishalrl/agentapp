@@ -39,9 +39,10 @@ class CounterRequestBloc extends Bloc<CounterRequestEvent, CounterRequestState> 
     if (result is Error<CounterRequestEntity>) {
       final failure = result.failure;
       print('   ❌ RequestBusAccess Error: ${failure.message}');
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(
         isLoading: false,
-        errorMessage: failure.message,
+        errorMessage: errorMessage,
         errorFailure: failure,
       ));
     } else if (result is Success<CounterRequestEntity>) {

@@ -7,6 +7,13 @@ import '../bloc/events/sales_event.dart';
 import '../bloc/states/sales_state.dart';
 import '../../../../core/injection/injection.dart' as di;
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/error_state_widget.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/app_bar.dart';
+import '../../../../core/widgets/app_dialog.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
+import '../../../../core/widgets/back_button_handler.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class SalesPage extends StatelessWidget {
   const SalesPage({super.key});
@@ -25,19 +32,11 @@ class _SalesView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Sales & Reports'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/dashboard');
-            }
-          },
-        ),
+    return BackButtonHandler(
+      enableDoubleBackToExit: false,
+      child: Scaffold(
+      appBar: AppAppBar(
+        title: 'Sales & Reports',
         actions: [
           IconButton(
             icon: const Icon(Icons.filter_list),
@@ -58,30 +57,13 @@ class _SalesView extends StatelessWidget {
         },
         builder: (context, state) {
           if (state is SalesLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonList(itemCount: 5, itemHeight: 100);
           }
 
           if (state is SalesError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                  const SizedBox(height: 16),
-                  Text(
-                    state.message,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.red[700]),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      context.read<SalesBloc>().add(GetSalesSummaryEvent());
-                    },
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+            return ErrorStateWidget(
+              message: state.message,
+              onRetry: () => context.read<SalesBloc>().add(GetSalesSummaryEvent()),
             );
           }
 
@@ -128,9 +110,15 @@ class _SalesView extends StatelessWidget {
             );
           }
 
-          return const Center(child: Text('No data'));
+          return const EmptyStateWidget(
+            icon: Icons.bar_chart,
+            title: 'No data',
+            description: 'Sales data will appear here when available.',
+          );
         },
       ),
+        ),
+      
     );
   }
 
@@ -138,51 +126,41 @@ class _SalesView extends StatelessWidget {
     final startDateController = TextEditingController();
     final endDateController = TextEditingController();
 
-    showDialog(
+    AppDialog.show(
       context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Filter Sales'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: startDateController,
-              decoration: const InputDecoration(
-                labelText: 'Start Date (YYYY-MM-DD)',
-              ),
+      title: 'Filter Sales',
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          TextField(
+            controller: startDateController,
+            decoration: const InputDecoration(
+              labelText: 'Start Date (YYYY-MM-DD)',
             ),
-            const SizedBox(height: 16),
-            TextField(
-              controller: endDateController,
-              decoration: const InputDecoration(
-                labelText: 'End Date (YYYY-MM-DD)',
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => context.pop(),
-            child: const Text('Cancel'),
           ),
-          ElevatedButton(
-            onPressed: () {
-              context.read<SalesBloc>().add(
-                    GetSalesSummaryEvent(
-                      startDate: startDateController.text.isEmpty
-                          ? null
-                          : startDateController.text,
-                      endDate: endDateController.text.isEmpty
-                          ? null
-                          : endDateController.text,
-                    ),
-                  );
-              Navigator.of(context).pop();
-            },
-            child: const Text('Apply'),
+          const SizedBox(height: AppTheme.spacingM),
+          TextField(
+            controller: endDateController,
+            decoration: const InputDecoration(
+              labelText: 'End Date (YYYY-MM-DD)',
+            ),
           ),
         ],
       ),
+      primaryLabel: 'Apply',
+      onPrimary: () {
+        context.read<SalesBloc>().add(
+              GetSalesSummaryEvent(
+                startDate: startDateController.text.isEmpty
+                    ? null
+                    : startDateController.text,
+                endDate: endDateController.text.isEmpty
+                    ? null
+                    : endDateController.text,
+              ),
+            );
+        if (context.mounted) Navigator.of(context).pop();
+      },
     );
   }
 }
@@ -214,7 +192,7 @@ class _SummaryCard extends StatelessWidget {
                     icon: Icons.currency_rupee,
                     label: 'Total Sales',
                     value: 'Rs. ${NumberFormat('#,##0.00').format(summary.totalSales)}',
-                    color: Colors.green,
+                    color: AppTheme.successColor,
                   ),
                 ),
                 Expanded(
@@ -222,7 +200,7 @@ class _SummaryCard extends StatelessWidget {
                     icon: Icons.confirmation_number,
                     label: 'Bookings',
                     value: summary.totalBookings.toString(),
-                    color: Colors.blue,
+                    color: AppTheme.statusInfo,
                   ),
                 ),
               ],
@@ -235,7 +213,7 @@ class _SummaryCard extends StatelessWidget {
                     icon: Icons.account_balance_wallet,
                     label: 'Commission',
                     value: 'Rs. ${NumberFormat('#,##0.00').format(summary.totalCommission)}',
-                    color: Colors.purple,
+                    color: AppTheme.secondaryColor,
                   ),
                 ),
                 Expanded(
@@ -243,7 +221,7 @@ class _SummaryCard extends StatelessWidget {
                     icon: Icons.currency_rupee,
                     label: 'Refunds',
                     value: 'Rs. ${NumberFormat('#,##0.00').format(summary.totalRefunds)}',
-                    color: Colors.orange,
+                    color: AppTheme.warningColor,
                   ),
                 ),
               ],
@@ -278,17 +256,17 @@ class _PaymentMethodBreakdown extends StatelessWidget {
             _PaymentItem(
               label: 'Cash',
               amount: summary.cashSales,
-              color: Colors.orange,
+              color: AppTheme.warningColor,
             ),
             _PaymentItem(
               label: 'Online',
               amount: summary.onlineSales,
-              color: Colors.blue,
+              color: AppTheme.statusInfo,
             ),
             _PaymentItem(
               label: 'Wallet',
               amount: summary.walletSales,
-              color: Colors.purple,
+              color: AppTheme.secondaryColor,
             ),
           ],
         ),
@@ -333,7 +311,7 @@ class _StatItem extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: Colors.grey[600],
+                  color: AppTheme.textSecondary,
                 ),
           ),
         ],

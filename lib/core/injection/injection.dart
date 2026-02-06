@@ -118,6 +118,12 @@ import '../../features/wallet/domain/repositories/wallet_repository.dart';
 import '../../features/wallet/domain/usecases/add_money.dart';
 import '../../features/wallet/domain/usecases/get_transactions.dart';
 import '../../features/wallet/presentation/bloc/wallet_bloc.dart';
+import '../../features/wallet/data/datasources/wallet_hold_remote_data_source.dart';
+import '../../features/wallet/data/repositories/wallet_hold_repository_impl.dart';
+import '../../features/wallet/domain/repositories/wallet_hold_repository.dart';
+import '../../features/wallet/domain/usecases/create_wallet_hold.dart';
+import '../../features/wallet/domain/usecases/release_wallet_hold.dart';
+import '../../features/wallet/domain/usecases/confirm_wallet_hold.dart';
 import '../../features/driver_management/data/datasources/driver_management_remote_data_source.dart';
 import '../../features/driver_management/data/repositories/driver_management_repository_impl.dart';
 import '../../features/driver_management/domain/repositories/driver_management_repository.dart';
@@ -545,6 +551,25 @@ Future<void> init() async {
   // Data sources
   sl.registerLazySingleton<WalletRemoteDataSource>(
     () => WalletRemoteDataSourceImpl(sl()),
+  );
+  
+  // Wallet Hold dependencies
+  // Use cases
+  sl.registerLazySingleton(() => CreateWalletHold(sl()));
+  sl.registerLazySingleton(() => ReleaseWalletHold(sl()));
+  sl.registerLazySingleton(() => ConfirmWalletHold(sl()));
+
+  // Repository
+  sl.registerLazySingleton<WalletHoldRepository>(
+    () => WalletHoldRepositoryImpl(
+      remoteDataSource: sl(),
+      getStoredToken: sl(),
+    ),
+  );
+
+  // Data sources
+  sl.registerLazySingleton<WalletHoldRemoteDataSource>(
+    () => WalletHoldRemoteDataSourceImpl(apiClient: sl()),
   );
 
   //! Features - Driver Management

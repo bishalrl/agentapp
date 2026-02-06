@@ -8,6 +8,7 @@ import '../../features/authentication/presentation/pages/change_password_page.da
 import '../../features/authentication/presentation/pages/forgot_password_page.dart';
 import '../../features/authentication/presentation/pages/reset_password_page.dart';
 import '../../features/dashboard/presentation/pages/dashboard_page.dart';
+import '../../features/dashboard/presentation/pages/redesigned_dashboard_page.dart';
 import '../../features/bus_driver/presentation/pages/driver_login_page.dart';
 import '../../features/bus_driver/presentation/pages/driver_dashboard_page.dart';
 import '../../features/bus_driver/presentation/pages/driver_tab_dashboard_page.dart';
@@ -123,7 +124,7 @@ class AppRouter {
               GoRoute(
                 path: '/dashboard',
                 name: 'dashboard',
-                builder: (context, state) => const DashboardPage(),
+                builder: (context, state) => const RedesignedDashboardPage(),
               ),
             ],
           ),

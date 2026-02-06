@@ -2,11 +2,15 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/error_state_widget.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
 import '../../../../core/widgets/back_button_handler.dart';
 import '../../../../core/widgets/main_drawer.dart';
 import '../../../../core/widgets/enhanced_card.dart';
+import '../../../../core/widgets/search_bar.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/utils/bloc_extensions.dart';
+import 'package:intl/intl.dart';
 import '../bloc/bus_bloc.dart';
 import '../bloc/events/bus_event.dart';
 import '../bloc/states/bus_state.dart';
@@ -57,13 +61,10 @@ class _BusListPageState extends State<BusListPage> {
         appBar: AppBar(
           automaticallyImplyLeading: false,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: const Icon(Icons.menu),
             onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/dashboard');
-              }
+              final scaffold = Scaffold.maybeOf(context);
+              if (scaffold?.hasDrawer == true) scaffold!.openDrawer();
             },
           ),
           title: const Text('Buses'),
@@ -71,12 +72,25 @@ class _BusListPageState extends State<BusListPage> {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: _clearSearch,
+              tooltip: 'Refresh',
             ),
           ],
         ),
         body: Column(
           children: [
-            _buildSearchBar(),
+            Padding(
+              padding: const EdgeInsets.all(AppTheme.spacingM),
+              child: AppSearchBar(
+                hintText: 'Search by bus number or name...',
+                controller: _searchController,
+                onChanged: (value) {
+                  if (value.isEmpty) {
+                    _clearSearch();
+                  }
+                },
+                onSubmitted: (_) => _performSearch(),
+              ),
+            ),
             Expanded(
               child: BlocConsumer<BusBloc, BusState>(
                 listener: (context, state) {
@@ -110,7 +124,9 @@ class _BusListPageState extends State<BusListPage> {
                 },
                 builder: (context, state) {
                   if (state.isLoading && state.buses.isEmpty && state.searchedBus == null) {
-                    return const Center(child: CircularProgressIndicator());
+                    return const Center(
+                      child: CircularProgressIndicator(),
+                    );
                   }
 
                   if (state.searchedBus != null) {
@@ -118,11 +134,20 @@ class _BusListPageState extends State<BusListPage> {
                   }
 
                   if (state.errorMessage != null && state.buses.isEmpty) {
-                    return _buildErrorState(context, state.errorMessage!);
+                    return ErrorStateWidget(
+                      message: state.errorMessage!,
+                      onRetry: _clearSearch,
+                    );
                   }
 
                   if (state.buses.isEmpty) {
-                    return _buildEmptyState(context);
+                    return EmptyStateWidget(
+                      icon: Icons.directions_bus_outlined,
+                      title: 'No buses available',
+                      description: 'Request access to buses to start booking.',
+                      actionLabel: 'Request Bus Access',
+                      onAction: () => context.go('/counter/request-bus-access'),
+                    );
                   }
 
                   return _buildBusList(context, state);
@@ -135,57 +160,21 @@ class _BusListPageState extends State<BusListPage> {
     );
   }
 
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.all(AppTheme.spacingM),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: _searchController,
-              decoration: InputDecoration(
-                hintText: 'Search by bus number...',
-                prefixIcon: const Icon(Icons.search),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusL),
-                  borderSide: BorderSide(color: Colors.grey.shade300),
-                ),
-                focusedBorder: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(AppTheme.radiusL),
-                  borderSide: const BorderSide(color: AppTheme.primaryColor),
-                ),
-                contentPadding: const EdgeInsets.symmetric(vertical: 10.0),
-              ),
-              onSubmitted: (_) => _performSearch(),
-            ),
-          ),
-          const SizedBox(width: AppTheme.spacingS),
-          ElevatedButton(
-            onPressed: _performSearch,
-            style: ElevatedButton.styleFrom(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(AppTheme.radiusL),
-              ),
-            ),
-            child: const Text('Search'),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildSearchResults(BuildContext context, BusState state) {
-    return Padding(
+    return SingleChildScrollView(
       padding: const EdgeInsets.all(AppTheme.spacingM),
       child: Column(
         children: [
           _buildBusCard(context, state.searchedBus!),
           const SizedBox(height: AppTheme.spacingM),
-          TextButton.icon(
-            onPressed: _clearSearch,
-            icon: const Icon(Icons.clear),
-            label: const Text('Clear Search'),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: _clearSearch,
+              icon: const Icon(Icons.clear),
+              label: const Text('Clear Search'),
+            ),
           ),
         ],
       ),
@@ -221,310 +210,364 @@ class _BusListPageState extends State<BusListPage> {
     );
   }
 
-  Widget _buildErrorState(BuildContext context, String errorMessage) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-          const SizedBox(height: 16),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 32),
-            child: Text(
-              errorMessage,
-              style: TextStyle(color: Colors.red[700]),
-              textAlign: TextAlign.center,
-            ),
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton(
-            onPressed: _clearSearch,
-            child: const Text('Retry'),
-          ),
-          const SizedBox(height: 8),
-          TextButton(
-            onPressed: () => context.go('/login'),
-            child: const Text('Go to Login'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildEmptyState(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Icons.directions_bus_outlined, size: 80, color: Colors.grey[400]),
-          const SizedBox(height: 16),
-          Text(
-            'No buses available',
-            style: Theme.of(context).textTheme.titleLarge?.copyWith(color: Colors.grey[600]),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            'Create a bus or request access to see them here',
-            style: Theme.of(context).textTheme.bodyMedium?.copyWith(color: Colors.grey[500]),
-            textAlign: TextAlign.center,
-          ),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(
-            onPressed: () => context.go('/counter/request-bus-access'),
-            icon: const Icon(Icons.request_quote),
-            label: const Text('Request Bus Access'),
-          ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildBusCard(BuildContext context, bus) {
     final theme = Theme.of(context);
+    final hasNoAccess = bus.hasNoAccess == true || bus.hasAccess == false;
+    final hasRestrictedAccess = bus.hasRestrictedAccess == true;
+    final hasFullAccess = bus.hasAccess == true && !hasRestrictedAccess;
+    // Calculate available seats: if restricted access, use allowedSeats count, otherwise use totalSeats
+    final availableSeats = hasRestrictedAccess && bus.allowedSeats != null
+        ? bus.allowedSeats!.length
+        : bus.totalSeats;
+    final isActive = bus.isActive ?? true;
+
     return EnhancedCard(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingM),
       onTap: () => context.go('/buses/${bus.id}'),
+      elevation: CardElevation.raised,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppTheme.spacingM),
-                decoration: BoxDecoration(
-                  color: bus.isActive 
-                      ? AppTheme.primaryColor.withOpacity(0.1) 
-                      : Colors.grey.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusM),
-                ),
-                child: Icon(
-                  Icons.directions_bus_rounded,
-                  color: bus.isActive ? AppTheme.primaryColor : Colors.grey,
-                  size: 28,
-                ),
+          // Status Banner at Top
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.spacingM,
+              vertical: AppTheme.spacingS,
+            ),
+            decoration: BoxDecoration(
+              color: isActive
+                  ? AppTheme.successColor.withOpacity(0.1)
+                  : AppTheme.errorColor.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(AppTheme.radiusM),
+                topRight: Radius.circular(AppTheme.radiusM),
               ),
-              const SizedBox(width: AppTheme.spacingM),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      bus.name,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  isActive ? Icons.check_circle : Icons.cancel,
+                  color: isActive ? AppTheme.successColor : AppTheme.errorColor,
+                  size: 18,
+                ),
+                const SizedBox(width: AppTheme.spacingS),
+                Text(
+                  isActive ? 'ACTIVE' : 'INACTIVE',
+                  style: theme.textTheme.bodyMedium?.copyWith(
+                    color: isActive ? AppTheme.successColor : AppTheme.errorColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                    letterSpacing: 0.5,
+                  ),
+                ),
+                const Spacer(),
+                // Access Status Badge
+                if (hasNoAccess)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacingS,
+                      vertical: 4,
                     ),
-                    const SizedBox(height: AppTheme.spacingXS),
-                    Row(
+                    decoration: BoxDecoration(
+                      color: AppTheme.warningColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Icon(Icons.route_rounded, size: 14, color: AppTheme.textSecondary),
-                        const SizedBox(width: AppTheme.spacingXS),
+                        Icon(
+                          Icons.lock_outline,
+                          size: 14,
+                          color: AppTheme.warningColor,
+                        ),
+                        const SizedBox(width: 4),
                         Text(
-                          '${bus.from} → ${bus.to}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textSecondary,
+                          'NO ACCESS',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.warningColor,
                           ),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.spacingS,
-                  vertical: AppTheme.spacingXS,
-                ),
-                decoration: BoxDecoration(
-                  color: bus.isActive 
-                      ? AppTheme.successColor.withOpacity(0.1) 
-                      : AppTheme.errorColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
-                  border: Border.all(
-                    color: bus.isActive ? AppTheme.successColor : AppTheme.errorColor,
-                    width: 1.5,
-                  ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      bus.isActive ? Icons.check_circle_rounded : Icons.cancel_rounded,
-                      size: 14,
-                      color: bus.isActive ? AppTheme.successColor : AppTheme.errorColor,
+                  )
+                else if (hasRestrictedAccess)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacingS,
+                      vertical: 4,
                     ),
-                    const SizedBox(width: 4),
-                    Text(
-                      bus.isActive ? 'Active' : 'Inactive',
-                      style: theme.textTheme.bodySmall?.copyWith(
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                        color: bus.isActive ? AppTheme.successColor : AppTheme.errorColor,
+                    decoration: BoxDecoration(
+                      color: AppTheme.statusInfo.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.lock_open,
+                          size: 14,
+                          color: AppTheme.statusInfo,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'LIMITED',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.statusInfo,
+                          ),
+                        ),
+                      ],
+                    ),
+                  )
+                else if (hasFullAccess)
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: AppTheme.spacingS,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.successColor.withOpacity(0.2),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(
+                          Icons.check_circle_outline,
+                          size: 14,
+                          color: AppTheme.successColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          'FULL ACCESS',
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            fontSize: 11,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.successColor,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+            ),
+          ),
+
+          // Main Content
+          Padding(
+            padding: const EdgeInsets.all(AppTheme.spacingM),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Bus Name - LARGE and PROMINENT
+                Row(
+                  children: [
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        color: AppTheme.primaryColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                      ),
+                      child: Icon(
+                        Icons.directions_bus,
+                        color: AppTheme.primaryColor,
+                        size: 32,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacingM),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Bus Name',
+                            style: theme.textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                              fontSize: 11,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            bus.name.isEmpty ? 'Bus ${bus.id.substring(0, 8)}' : bus.name,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                              fontSize: 20,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
-              ),
-            ],
+
+                const SizedBox(height: AppTheme.spacingL),
+
+                // Route - Clear and Prominent
+                Container(
+                  padding: const EdgeInsets.all(AppTheme.spacingM),
+                  decoration: BoxDecoration(
+                    color: AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                    border: Border.all(
+                      color: AppTheme.lightBorderColor,
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.route,
+                        color: AppTheme.primaryColor,
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppTheme.spacingS),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Route',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${bus.from} → ${bus.to}',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimary,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                const SizedBox(height: AppTheme.spacingM),
+
+                // Key Info Grid - Date, Time, Price, Seats
+                Row(
+                  children: [
+                    Expanded(
+                      child: _BusInfoItem(
+                        icon: Icons.calendar_today,
+                        label: 'Date',
+                        value: DateFormat('MMM d').format(bus.date),
+                      ),
+                    ),
+                    Expanded(
+                      child: _BusInfoItem(
+                        icon: Icons.access_time,
+                        label: 'Time',
+                        value: _formatTime(bus.time),
+                      ),
+                    ),
+                    Expanded(
+                      child: _BusInfoItem(
+                        icon: Icons.currency_rupee,
+                        label: 'Price',
+                        value: '₹${NumberFormat('#,##0').format(bus.price)}',
+                      ),
+                    ),
+                    Expanded(
+                      child: _BusInfoItem(
+                        icon: Icons.event_seat,
+                        label: 'Seats',
+                        value: '$availableSeats/${bus.totalSeats}',
+                        highlight: availableSeats == 0,
+                      ),
+                    ),
+                  ],
+                ),
+
+                // Access Details
+                if (hasRestrictedAccess && bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty) ...[
+                  const SizedBox(height: AppTheme.spacingM),
+                  Container(
+                    padding: const EdgeInsets.all(AppTheme.spacingM),
+                    decoration: BoxDecoration(
+                      color: AppTheme.statusInfo.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                      border: Border.all(
+                        color: AppTheme.statusInfo.withOpacity(0.3),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.info_outline,
+                          size: 20,
+                          color: AppTheme.statusInfo,
+                        ),
+                        const SizedBox(width: AppTheme.spacingS),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                'Allowed Seats',
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.textSecondary,
+                                  fontSize: 11,
+                                ),
+                              ),
+                              const SizedBox(height: 2),
+                              Text(
+                                bus.allowedSeats!.map((s) => s.toString()).join(', '),
+                                style: theme.textTheme.bodyMedium?.copyWith(
+                                  color: AppTheme.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Action Button
+                if (hasNoAccess) ...[
+                  const SizedBox(height: AppTheme.spacingM),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton.icon(
+                      onPressed: () => context.go('/counter/request-bus-access?busId=${bus.id}'),
+                      icon: const Icon(Icons.request_quote, size: 20),
+                      label: const Text('Request Access'),
+                      style: ElevatedButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingM),
+                      ),
+                    ),
+                  ),
+                ],
+              ],
+            ),
           ),
-          const SizedBox(height: AppTheme.spacingM),
-          // Access Status Badge
-          if (bus.hasNoAccess == true || bus.hasAccess == false)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.spacingS,
-                vertical: AppTheme.spacingXS,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.orange.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppTheme.radiusS),
-                border: Border.all(color: Colors.orange, width: 1),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.lock_outline, size: 14, color: Colors.orange.shade700),
-                  const SizedBox(width: 4),
-                  Text(
-                    'No Access',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.orange.shade700,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else if (bus.hasRestrictedAccess == true)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.spacingS,
-                vertical: AppTheme.spacingXS,
-              ),
-              decoration: BoxDecoration(
-                color: Colors.blue.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppTheme.radiusS),
-                border: Border.all(color: Colors.blue, width: 1),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.lock_open, size: 14, color: Colors.blue.shade700),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Limited Access',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.blue.shade700,
-                    ),
-                  ),
-                ],
-              ),
-            )
-          else if (bus.hasAccess == true)
-            Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: AppTheme.spacingS,
-                vertical: AppTheme.spacingXS,
-              ),
-              decoration: BoxDecoration(
-                color: AppTheme.successColor.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(AppTheme.radiusS),
-                border: Border.all(color: AppTheme.successColor, width: 1),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.check_circle_outline, size: 14, color: AppTheme.successColor),
-                  const SizedBox(width: 4),
-                  Text(
-                    'Full Access',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.successColor,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          const SizedBox(height: AppTheme.spacingM),
-          Divider(color: Colors.grey.shade200, height: 1),
-          const SizedBox(height: AppTheme.spacingM),
-          Row(
-            children: [
-              Expanded(
-                child: _BusInfoItem(
-                  icon: Icons.calendar_today_rounded,
-                  label: 'Date',
-                  value: bus.date.toString().split(' ')[0],
-                ),
-              ),
-              Expanded(
-                child: _BusInfoItem(
-                  icon: Icons.access_time_rounded,
-                  label: 'Time',
-                  value: bus.time,
-                ),
-              ),
-              Expanded(
-                child: _BusInfoItem(
-                  icon: Icons.currency_rupee_rounded,
-                  label: 'Price',
-                  value: '₹${bus.price.toStringAsFixed(0)}',
-                ),
-              ),
-              Expanded(
-                child: _BusInfoItem(
-                  icon: Icons.event_seat_rounded,
-                  label: 'Seats',
-                  value: '${bus.totalSeats}',
-                ),
-              ),
-            ],
-          ),
-          if (bus.accessId != null || (bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty)) ...[
-            const SizedBox(height: AppTheme.spacingS),
-            Container(
-              padding: const EdgeInsets.all(AppTheme.spacingS),
-              decoration: BoxDecoration(
-                color: Colors.blue.shade50,
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.blue.shade200),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.check_circle, size: 16, color: Colors.blue.shade700),
-                  const SizedBox(width: AppTheme.spacingXS),
-                  Expanded(
-                    child: Text(
-                      bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty
-                          ? 'Allowed Seats: ${bus.allowedSeats!.map((s) => s.toString()).join(', ')}'
-                          : 'Full Access',
-                      style: TextStyle(fontSize: 12, color: Colors.blue.shade700),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ] else ...[
-            const SizedBox(height: AppTheme.spacingS),
-            SizedBox(
-              width: double.infinity,
-              child: OutlinedButton.icon(
-                onPressed: () => context.go('/counter/request-bus-access?busId=${bus.id}'),
-                icon: const Icon(Icons.request_quote, size: 18),
-                label: const Text('Request Access'),
-                style: OutlinedButton.styleFrom(foregroundColor: AppTheme.primaryColor),
-              ),
-            ),
-          ],
         ],
       ),
     );
+  }
+
+  String _formatTime(String time) {
+    try {
+      final parsed = DateFormat('HH:mm').parse(time);
+      return DateFormat('h:mm a').format(parsed);
+    } catch (e) {
+      return time;
+    }
   }
 }
 
@@ -532,45 +575,56 @@ class _BusInfoItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final String value;
+  final bool highlight;
 
   const _BusInfoItem({
     required this.icon,
     required this.label,
     required this.value,
+    this.highlight = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Column(
-      children: [
-        Icon(icon, size: 16, color: AppTheme.textTertiary),
-        const SizedBox(height: AppTheme.spacingXS),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+    return Container(
+      padding: const EdgeInsets.all(AppTheme.spacingS),
+      decoration: BoxDecoration(
+        color: highlight
+            ? AppTheme.errorColor.withOpacity(0.05)
+            : AppTheme.surfaceColor,
+        borderRadius: BorderRadius.circular(AppTheme.radiusS),
+      ),
+      child: Column(
+        children: [
+          Icon(
+            icon,
+            size: 20,
+            color: highlight ? AppTheme.errorColor : AppTheme.primaryColor,
           ),
-        ),
-        Text(
-          label,
-          style: theme.textTheme.bodySmall?.copyWith(
-            color: AppTheme.textTertiary,
-            fontSize: 10,
+          const SizedBox(height: AppTheme.spacingXS),
+          Text(
+            value,
+            style: theme.textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: highlight ? AppTheme.errorColor : AppTheme.textPrimary,
+              fontSize: 16,
+            ),
+            textAlign: TextAlign.center,
           ),
-        ),
-      ],
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: theme.textTheme.bodySmall?.copyWith(
+              color: AppTheme.textSecondary,
+              fontSize: 11,
+            ),
+            textAlign: TextAlign.center,
+          ),
+        ],
+      ),
     );
   }
 }
 
-class SuccessSnackBar extends SnackBar {
-  SuccessSnackBar({super.key, required String message})
-      : super(
-          content: Text(message),
-          backgroundColor: Colors.green,
-          behavior: SnackBarBehavior.floating,
-        );
-}
 

@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../../../core/bloc/optimized_bloc_mixin.dart';
 import '../../../../core/bloc/granular_loading_state.dart';
 import '../../../../core/cache/cache_manager.dart';
@@ -73,18 +74,12 @@ class OptimizedDashboardBloc extends Bloc<DashboardEvent, DashboardState>
     ).catchError((error) {
       final failure = error is Failure ? error : ServerFailure(error.toString());
       
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else if (failure is NetworkFailure) {
-        // If we have cached data, show it with error banner
-        if (state.dashboard != null) {
-          errorMessage = 'Unable to refresh. Showing cached data.';
-        } else {
-          errorMessage = 'Network error. Please check your connection.';
-        }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
+      final String displayMessage;
+      if (failure is NetworkFailure && state.dashboard != null) {
+        displayMessage = 'Unable to refresh. Showing cached data.';
       } else {
-        errorMessage = failure.message;
+        displayMessage = errorMessage;
       }
       
       emit(state.copyWith(
@@ -93,7 +88,7 @@ class OptimizedDashboardBloc extends Bloc<DashboardEvent, DashboardState>
           isRefreshing: false,
           isInitialLoad: false,
         ),
-        errorMessage: errorMessage,
+        errorMessage: displayMessage,
       ));
     });
   }

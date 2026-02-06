@@ -3,6 +3,7 @@ import 'package:agentapp/features/notifications/presentation/bloc/states/notific
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/notification_entity.dart';
 import '../../domain/usecases/get_notifications.dart';
 import '../../domain/usecases/mark_notifications_read.dart';
@@ -45,12 +46,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     );
     if (result is Error<List<NotificationEntity>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(NotificationError(errorMessage));
     } else if (result is Success<List<NotificationEntity>>) {
       final notifications = result.data;
@@ -67,12 +63,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     final result = await markAsRead(notificationIds: event.notificationIds);
     if (result is Error<int>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(NotificationError(errorMessage));
     } else if (result is Success<int>) {
       emit(NotificationsMarkedAsRead(result.data));
@@ -87,12 +78,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     final result = await markAllAsRead();
     if (result is Error<int>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(NotificationError(errorMessage));
     } else if (result is Success<int>) {
       emit(AllNotificationsMarkedAsRead(result.data));
@@ -107,12 +93,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     final result = await deleteNotification(event.notificationId);
     if (result is Error<void>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(NotificationError(errorMessage));
     } else if (result is Success<void>) {
       emit(NotificationDeleted());
@@ -127,12 +108,7 @@ class NotificationBloc extends Bloc<NotificationEvent, NotificationState> {
     final result = await deleteAllNotifications();
     if (result is Error<int>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(NotificationError(errorMessage));
     } else if (result is Success<int>) {
       emit(AllNotificationsDeleted(result.data));

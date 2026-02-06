@@ -8,6 +8,7 @@ import '../bloc/auth_bloc.dart';
 import '../../../../core/injection/injection.dart' as di;
 import '../../../../core/widgets/error_snackbar.dart';
 import '../../../../core/utils/bloc_extensions.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class ChangePasswordPage extends StatelessWidget {
   const ChangePasswordPage({super.key});
@@ -45,7 +46,7 @@ class _ChangePasswordPageViewState extends State<_ChangePasswordPageView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -219,11 +220,11 @@ class _ChangePasswordPageViewState extends State<_ChangePasswordPageView> {
                               ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
+                                borderSide: BorderSide(color: AppTheme.lightBorderColor!),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
+                                borderSide: BorderSide(color: AppTheme.lightBorderColor!),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
@@ -233,7 +234,7 @@ class _ChangePasswordPageViewState extends State<_ChangePasswordPageView> {
                                 ),
                               ),
                               filled: true,
-                              fillColor: Colors.grey[50],
+                              fillColor: AppTheme.surfaceColor,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                             ),
                             validator: (value) {
@@ -256,11 +257,11 @@ class _ChangePasswordPageViewState extends State<_ChangePasswordPageView> {
                               ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
+                                borderSide: BorderSide(color: AppTheme.lightBorderColor!),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
+                                borderSide: BorderSide(color: AppTheme.lightBorderColor!),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
@@ -270,7 +271,7 @@ class _ChangePasswordPageViewState extends State<_ChangePasswordPageView> {
                                 ),
                               ),
                               filled: true,
-                              fillColor: Colors.grey[50],
+                              fillColor: AppTheme.surfaceColor,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                             ),
                             validator: (value) {
@@ -296,11 +297,11 @@ class _ChangePasswordPageViewState extends State<_ChangePasswordPageView> {
                               ),
                               border: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
+                                borderSide: BorderSide(color: AppTheme.lightBorderColor!),
                               ),
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
-                                borderSide: BorderSide(color: Colors.grey[300]!),
+                                borderSide: BorderSide(color: AppTheme.lightBorderColor!),
                               ),
                               focusedBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
@@ -310,7 +311,7 @@ class _ChangePasswordPageViewState extends State<_ChangePasswordPageView> {
                                 ),
                               ),
                               filled: true,
-                              fillColor: Colors.grey[50],
+                              fillColor: AppTheme.surfaceColor,
                               contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
                             ),
                             validator: (value) {

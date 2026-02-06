@@ -3,6 +3,7 @@ import 'package:agentapp/features/sales/presentation/bloc/states/sales_state.dar
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/sales_entity.dart';
 import '../../domain/usecases/get_sales_summary.dart';
 import '../../data/models/sales_model.dart';
@@ -29,12 +30,7 @@ class SalesBloc extends Bloc<SalesEvent, SalesState> {
     );
     if (result is Error<Map<String, dynamic>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(SalesError(errorMessage));
     } else if (result is Success<Map<String, dynamic>>) {
       final data = result.data;

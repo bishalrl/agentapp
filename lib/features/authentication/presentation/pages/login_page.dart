@@ -166,7 +166,8 @@ class _LoginPageViewState extends State<_LoginPageView> {
                                       if (value == null || value.isEmpty) {
                                         return 'Please enter email';
                                       }
-                                      if (!value.contains('@')) {
+                                      final trimmed = value.trim();
+                                      if (!trimmed.contains('@')) {
                                         return 'Please enter a valid email';
                                       }
                                       return null;
@@ -221,8 +222,8 @@ class _LoginPageViewState extends State<_LoginPageView> {
                                                     print('📤 Adding LoginEvent to AuthBloc');
                                                     authBloc.add(
                                                       LoginEvent(
-                                                        email: emailController.text,
-                                                        password: passwordController.text,
+                                                        email: emailController.text.trim(),
+                                                        password: passwordController.text.trim(),
                                                       ),
                                                     );
                                                     print('✅ LoginEvent added successfully');

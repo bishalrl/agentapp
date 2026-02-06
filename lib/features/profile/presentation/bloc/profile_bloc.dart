@@ -3,6 +3,7 @@ import 'package:agentapp/features/profile/presentation/bloc/states/profile_state
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/profile_entity.dart';
 import '../../domain/usecases/get_profile.dart';
 import '../../domain/usecases/update_profile.dart';
@@ -28,12 +29,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     final result = await getProfile();
     if (result is Error<ProfileEntity>) {
       final failure = (result as Error<ProfileEntity>).failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(ProfileError(errorMessage));
     } else if (result is Success<ProfileEntity>) {
       final profile = result.data;
@@ -66,12 +62,7 @@ class ProfileBloc extends Bloc<ProfileEvent, ProfileState> {
     );
     if (result is Error<ProfileEntity>) {
       final failure = (result as Error<ProfileEntity>).failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(ProfileError(errorMessage));
     } else if (result is Success<ProfileEntity>) {
       final profile = result.data;

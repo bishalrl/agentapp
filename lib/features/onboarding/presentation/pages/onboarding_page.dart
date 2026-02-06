@@ -7,6 +7,8 @@ import '../bloc/states/onboarding_state.dart';
 import '../bloc/onboarding_page_bloc.dart';
 import '../bloc/events/onboarding_page_event.dart';
 import '../bloc/states/onboarding_page_state.dart';
+import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/error_snackbar.dart';
 
 class OnboardingPage extends StatelessWidget {
   const OnboardingPage({super.key});
@@ -59,24 +61,24 @@ class _OnboardingPageView extends StatelessWidget {
                         onPageChanged: (index) {
                           context.read<OnboardingPageBloc>().add(OnboardingPageChangedEvent(index));
                         },
-                        children: const [
+                        children: [
                           _OnboardingStep(
-                            title: 'Welcome to Neelo Sewa',
+                            title: 'Welcome to Tejbi',
                             description: 'Manage your bus bookings efficiently with our powerful agent app',
                             icon: Icons.directions_bus,
-                            gradient: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                            gradient: const [AppTheme.primaryColor, AppTheme.primaryLight],
                           ),
-                          _OnboardingStep(
+                          const _OnboardingStep(
                             title: 'Track in Real-time',
                             description: 'Monitor bus locations and seat availability in real-time',
                             icon: Icons.location_on,
-                            gradient: [Color(0xFF10B981), Color(0xFF059669)],
+                            gradient: [AppTheme.accentColor, AppTheme.successColor],
                           ),
-                          _OnboardingStep(
+                          const _OnboardingStep(
                             title: 'Easy Booking',
                             description: 'Book seats quickly with our intuitive and modern interface',
                             icon: Icons.event_seat,
-                            gradient: [Color(0xFFF59E0B), Color(0xFFD97706)],
+                            gradient: [AppTheme.warningColor, Color(0xFFD97706)],
                           ),
                         ],
                       ),
@@ -154,7 +156,7 @@ class _PageIndicator extends StatelessWidget {
           decoration: BoxDecoration(
             color: currentPage == index
                 ? Theme.of(context).colorScheme.primary
-                : Colors.grey[300],
+                : AppTheme.lightBorderColor,
             borderRadius: BorderRadius.circular(4),
           ),
         );

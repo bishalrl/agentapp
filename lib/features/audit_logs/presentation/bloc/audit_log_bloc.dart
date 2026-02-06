@@ -3,6 +3,7 @@ import 'package:agentapp/features/audit_logs/presentation/bloc/states/audit_log_
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/audit_log_entity.dart';
 import '../../domain/usecases/get_audit_logs.dart';
 
@@ -28,12 +29,7 @@ class AuditLogBloc extends Bloc<AuditLogEvent, AuditLogState> {
     );
     if (result is Error<List<AuditLogEntity>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(AuditLogError(errorMessage));
     } else if (result is Success<List<AuditLogEntity>>) {
       emit(AuditLogsLoaded(result.data));

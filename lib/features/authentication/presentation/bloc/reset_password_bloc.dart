@@ -1,6 +1,7 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/usecases/reset_password.dart';
 import 'events/reset_password_event.dart';
 import 'states/reset_password_state.dart';
@@ -29,26 +30,7 @@ class ResetPasswordBloc extends Bloc<ResetPasswordEvent, ResetPasswordState> {
     if (result is Error<void>) {
       final failure = result.failure;
       print('   ❌ Reset Password Error: ${failure.message}');
-      
-      // Provide user-friendly error message
-      String errorMessage;
-      if (failure is NetworkFailure) {
-        final message = failure.message.toLowerCase();
-        if (message.contains('no route to host') || 
-            message.contains('connection refused') ||
-            message.contains('failed host lookup')) {
-          errorMessage = 'Unable to connect to server. Please check your internet connection and try again.';
-        } else if (message.contains('timeout')) {
-          errorMessage = 'Connection timeout. Please check your internet connection and try again.';
-        } else if (message.contains('no internet')) {
-          errorMessage = 'No internet connection. Please check your network settings.';
-        } else {
-          errorMessage = 'Network error. Please check your internet connection and try again.';
-        }
-      } else {
-        errorMessage = failure.message;
-      }
-      
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(
         isLoading: false,
         errorMessage: errorMessage,

@@ -1,6 +1,5 @@
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
-import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/booking_entity.dart';
 import '../../domain/usecases/create_booking.dart';
@@ -111,6 +110,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
       luggage: event.luggage,
       bagCount: event.bagCount,
       paymentMethod: event.paymentMethod,
+      holdId: event.holdId,
     );
 
     if (result is Error) {
@@ -145,12 +145,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     final result = await cancelMultipleBookings(bookingIds: event.bookingIds);
     if (result is Error<Map<String, dynamic>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<Map<String, dynamic>>) {
       emit(state.copyWith(
@@ -172,12 +167,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     );
     if (result is Error<BookingEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<BookingEntity>) {
       emit(state.copyWith(
@@ -261,12 +251,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     final result = await cancelBooking(event.bookingId);
     if (result is Error<BookingEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<BookingEntity>) {
       // Remove from bookings list
@@ -291,12 +276,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     );
     if (result is Error<void>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<void>) {
       // Refresh bus details to get updated seat locks
@@ -320,12 +300,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     );
     if (result is Error<void>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(state.copyWith(isLoading: false, errorMessage: errorMessage));
     } else if (result is Success<void>) {
       // Refresh bus details to get updated seat locks

@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/error_state_widget.dart';
 import '../../../../core/widgets/enhanced_card.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/back_button_handler.dart';
 import '../../../../core/injection/injection.dart' as di;
 import '../../domain/entities/bus_entity.dart';
 import '../bloc/bus_bloc.dart';
@@ -59,27 +61,19 @@ class _BusDetailPageState extends State<BusDetailPage> {
                   },
                 ),
               ),
-              body: Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                    const SizedBox(height: 16),
-                    const Text('Bus not found'),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () => context.go('/buses'),
-                      child: const Text('Go to Bus List'),
-                    ),
-                  ],
-                ),
+              body: ErrorStateWidget(
+                message: 'Bus not found',
+                icon: Icons.directions_bus,
+                onRetry: () => context.go('/buses'),
               ),
             );
           }
           
           final bus = state.buses[busIndex];
 
-          return Scaffold(
+          return BackButtonHandler(
+            enableDoubleBackToExit: false,
+            child: Scaffold(
             appBar: AppBar(
               title: Text(bus.name),
               leading: IconButton(
@@ -226,19 +220,19 @@ class _BusDetailPageState extends State<BusDetailPage> {
                                   vertical: AppTheme.spacingS,
                                 ),
                                 decoration: BoxDecoration(
-                                  color: Colors.green.shade50,
+                                  color: AppTheme.successColor.withOpacity(0.1),
                                   borderRadius: BorderRadius.circular(8),
-                                  border: Border.all(color: Colors.green.shade200),
+                                  border: Border.all(color: AppTheme.successColor.withOpacity(0.5)),
                                 ),
                                 child: Row(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+                                    Icon(Icons.check_circle, size: 16, color: AppTheme.successColor),
                                     const SizedBox(width: AppTheme.spacingXS),
                                     Text(
                                       'Assigned Bus',
                                       style: TextStyle(
-                                        color: Colors.green.shade700,
+                                        color: AppTheme.successColor,
                                         fontWeight: FontWeight.w500,
                                       ),
                                     ),
@@ -346,7 +340,7 @@ class _BusDetailPageState extends State<BusDetailPage> {
                             children: [
                               Row(
                                 children: [
-                                  Icon(Icons.lock_open_rounded, color: Colors.green.shade700),
+                                  Icon(Icons.lock_open_rounded, color: AppTheme.successColor),
                                   const SizedBox(width: AppTheme.spacingS),
                                   Text(
                                     'Access Information',
@@ -382,7 +376,7 @@ class _BusDetailPageState extends State<BusDetailPage> {
                                 'No Access',
                                 style: theme.textTheme.titleMedium?.copyWith(
                                   fontWeight: FontWeight.bold,
-                                  color: Colors.orange.shade700,
+                                  color: AppTheme.warningColor,
                                 ),
                               ),
                               const SizedBox(height: AppTheme.spacingS),
@@ -430,10 +424,13 @@ class _BusDetailPageState extends State<BusDetailPage> {
                 );
               },
             ),
-          );
+          ));
         },
       ),
-    );
+          );
+        
+        }
+      
   }
 
   void _showDeactivateDialog(BuildContext context, BusEntity bus) {
@@ -452,7 +449,7 @@ class _BusDetailPageState extends State<BusDetailPage> {
               context.pop();
               context.read<BusBloc>().add(DeactivateBusEvent(busId: bus.id));
             },
-            style: TextButton.styleFrom(foregroundColor: Colors.orange),
+            style: TextButton.styleFrom(foregroundColor: AppTheme.warningColor),
             child: const Text('Deactivate'),
           ),
         ],
@@ -460,7 +457,7 @@ class _BusDetailPageState extends State<BusDetailPage> {
     );
   }
 
-}
+
 
 class _InfoCard extends StatelessWidget {
   final String title;

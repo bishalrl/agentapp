@@ -6,6 +6,9 @@ import '../bloc/booking_bloc.dart';
 import '../bloc/events/booking_event.dart';
 import '../bloc/states/booking_state.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/error_state_widget.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 import '../../../../core/widgets/back_button_handler.dart';
 import '../../../../core/widgets/main_drawer.dart';
 import '../../../../core/widgets/enhanced_card.dart';
@@ -126,13 +129,10 @@ class _BookingListPageState extends State<BookingListPage> {
         appBar: AppBar(
           automaticallyImplyLeading: false,
           leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
+            icon: const Icon(Icons.menu),
             onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/dashboard');
-              }
+              final scaffold = Scaffold.maybeOf(context);
+              if (scaffold?.hasDrawer == true) scaffold!.openDrawer();
             },
           ),
           title: const Text('Bookings'),
@@ -157,7 +157,7 @@ class _BookingListPageState extends State<BookingListPage> {
                 color: Theme.of(context).scaffoldBackgroundColor,
                 border: Border(
                   bottom: BorderSide(
-                    color: Colors.grey.shade200,
+                    color: AppTheme.lightBorderColor,
                     width: 1,
                   ),
                 ),
@@ -243,73 +243,21 @@ class _BookingListPageState extends State<BookingListPage> {
             // Only show loading if bookings are empty (initial load)
             // If bookings exist, show them even if loading (for better UX)
             if (state.isLoading && state.bookings.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
+              return const SkeletonList(itemCount: 6, itemHeight: 88);
             }
 
             if (state.errorMessage != null) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.error_outline,
-                      size: 64,
-                      color: Colors.red[300],
-                    ),
-                    const SizedBox(height: 16),
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 32),
-                      child: Text(
-                        state.errorMessage!,
-                        style: TextStyle(color: Colors.red[700]),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    ElevatedButton(
-                      onPressed: () {
-                        context.read<BookingBloc>().add(GetBookingsEvent(date: _getDateForFilter()));
-                      },
-                      child: const Text('Retry'),
-                    ),
-                    const SizedBox(height: 8),
-                    TextButton(
-                      onPressed: () {
-                        context.go('/login');
-                      },
-                      child: const Text('Go to Login'),
-                    ),
-                  ],
-                ),
+              return ErrorStateWidget(
+                message: state.errorMessage!,
+                onRetry: () => context.read<BookingBloc>().add(GetBookingsEvent(date: _getDateForFilter())),
               );
             }
 
             if (state.bookings.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.event_busy,
-                      size: 80,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No bookings found',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Create your first booking to get started',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[500],
-                          ),
-                    ),
-                  ],
-                ),
+              return const EmptyStateWidget(
+                icon: Icons.event_busy,
+                title: 'No bookings found',
+                description: 'Create your first booking to get started.',
               );
             }
 
@@ -317,31 +265,10 @@ class _BookingListPageState extends State<BookingListPage> {
             final filteredBookings = _filterBookingsByDate(state.bookings);
             
             if (filteredBookings.isEmpty && state.bookings.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.event_busy,
-                      size: 80,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No bookings found',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      'Create your first booking to get started',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[500],
-                          ),
-                    ),
-                  ],
-                ),
+              return const EmptyStateWidget(
+                icon: Icons.event_busy,
+                title: 'No bookings found',
+                description: 'Create your first booking to get started.',
               );
             }
             
@@ -353,13 +280,13 @@ class _BookingListPageState extends State<BookingListPage> {
                     Icon(
                       Icons.filter_alt_off,
                       size: 80,
-                      color: Colors.grey[400],
+                      color: AppTheme.textTertiary,
                     ),
                     const SizedBox(height: 16),
                     Text(
                       'No bookings match the filter',
                       style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.grey[600],
+                            color: AppTheme.textSecondary,
                           ),
                     ),
                     const SizedBox(height: 8),
@@ -370,7 +297,7 @@ class _BookingListPageState extends State<BookingListPage> {
                               ? 'No bookings created yesterday'
                               : 'Try adjusting your filters',
                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[500],
+                            color: AppTheme.textSecondary,
                           ),
                     ),
                   ],
@@ -604,7 +531,7 @@ class _BookingListPageState extends State<BookingListPage> {
                       'Date',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
+                            color: AppTheme.textPrimary,
                           ),
                     ),
                     const SizedBox(height: 12),
@@ -698,7 +625,7 @@ class _BookingListPageState extends State<BookingListPage> {
                       'Status',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
+                            color: AppTheme.textPrimary,
                           ),
                     ),
                     const SizedBox(height: 8),
@@ -719,7 +646,7 @@ class _BookingListPageState extends State<BookingListPage> {
                       'Payment Method',
                       style: Theme.of(context).textTheme.titleSmall?.copyWith(
                             fontWeight: FontWeight.w600,
-                            color: Colors.grey[700],
+                            color: AppTheme.textPrimary,
                           ),
                     ),
                     const SizedBox(height: 8),
@@ -807,203 +734,141 @@ class _BookingCard extends StatelessWidget {
     required this.onTap,
   });
 
+  Color _getStatusColor(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return AppTheme.successColor;
+      case 'cancelled':
+        return AppTheme.errorColor;
+      case 'pending':
+        return AppTheme.warningColor;
+      default:
+        return AppTheme.textSecondary;
+    }
+  }
+
+  IconData _getStatusIcon(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return Icons.check_circle;
+      case 'cancelled':
+        return Icons.cancel;
+      case 'pending':
+        return Icons.pending;
+      default:
+        return Icons.info;
+    }
+  }
+
+  String _getStatusLabel(String status) {
+    switch (status.toLowerCase()) {
+      case 'confirmed':
+        return 'CONFIRMED';
+      case 'cancelled':
+        return 'CANCELLED';
+      case 'pending':
+        return 'PENDING';
+      default:
+        return status.toUpperCase();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final status = booking.status.toLowerCase();
-    Color statusColor;
-    IconData statusIcon;
-
-    switch (status) {
-      case 'confirmed':
-        statusColor = Colors.green;
-        statusIcon = Icons.check_circle;
-        break;
-      case 'cancelled':
-        statusColor = Colors.red;
-        statusIcon = Icons.cancel;
-        break;
-      case 'pending':
-        statusColor = Colors.orange;
-        statusIcon = Icons.pending;
-        break;
-      default:
-        statusColor = Colors.grey;
-        statusIcon = Icons.info;
-    }
-
     final theme = Theme.of(context);
+    final statusColor = _getStatusColor(booking.status);
+    final statusIcon = _getStatusIcon(booking.status);
+    final statusLabel = _getStatusLabel(booking.status);
+    final timeAgo = _getTimeAgo(booking.createdAt);
+
     return EnhancedCard(
       margin: const EdgeInsets.only(bottom: AppTheme.spacingM),
       onTap: onTap,
+      elevation: CardElevation.raised,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(AppTheme.spacingS),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
-                ),
-                child: Icon(
-                  statusIcon,
-                  color: statusColor,
-                  size: 24,
-                ),
+          // Status Banner at Top
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(
+              horizontal: AppTheme.spacingM,
+              vertical: AppTheme.spacingS,
+            ),
+            decoration: BoxDecoration(
+              color: statusColor.withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(AppTheme.radiusM),
+                topRight: Radius.circular(AppTheme.radiusM),
               ),
-              const SizedBox(width: AppTheme.spacingM),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      booking.ticketNumber,
-                      style: theme.textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: AppTheme.textPrimary,
-                      ),
-                    ),
-                    const SizedBox(height: AppTheme.spacingXS),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.route_rounded,
-                          size: 14,
-                          color: AppTheme.textSecondary,
-                        ),
-                        const SizedBox(width: AppTheme.spacingXS),
-                        Text(
-                          '${booking.bus.from} → ${booking.bus.to}',
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: AppTheme.spacingS,
-                  vertical: AppTheme.spacingXS,
-                ),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
-                  border: Border.all(
-                    color: statusColor.withOpacity(0.5),
-                    width: 1.5,
-                  ),
-                ),
-                child: Text(
-                  booking.status.toUpperCase(),
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+            ),
+            child: Row(
+              children: [
+                Icon(statusIcon, color: statusColor, size: 18),
+                const SizedBox(width: AppTheme.spacingS),
+                Text(
+                  statusLabel,
+                  style: theme.textTheme.bodyMedium?.copyWith(
                     color: statusColor,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
                     letterSpacing: 0.5,
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: AppTheme.spacingM),
-          Divider(
-            color: Colors.grey.shade200,
-            height: 1,
-          ),
-          const SizedBox(height: AppTheme.spacingM),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Expanded(
-                    child: _InfoColumn(
-                      label: 'Passenger',
-                      value: booking.passengerName,
-                      icon: Icons.person_rounded,
-                    ),
+                const Spacer(),
+                Text(
+                  booking.ticketNumber,
+                  style: theme.textTheme.bodySmall?.copyWith(
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w600,
+                    fontSize: 12,
                   ),
-                  Expanded(
-                    child: _InfoColumn(
-                      label: 'Seats',
-                      value: booking.seatNumbers.map((s) => s.toString()).join(', '),
-                      icon: Icons.event_seat_rounded,
-                    ),
-                  ),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Text(
-                          'Total',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textTertiary,
-                            fontSize: 11,
-                          ),
-                        ),
-                        const SizedBox(height: AppTheme.spacingXS),
-                        Text(
-                          'Rs. ${NumberFormat('#,##0').format(booking.totalPrice)}',
-                          style: theme.textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.primaryColor,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: AppTheme.spacingM),
-              Container(
-                padding: const EdgeInsets.all(AppTheme.spacingS),
-                decoration: BoxDecoration(
-                  color: AppTheme.surfaceColor,
-                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
                 ),
-                child: Row(
+              ],
+            ),
+          ),
+
+          // Main Content
+          Padding(
+            padding: const EdgeInsets.all(AppTheme.spacingM),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Passenger Name - LARGE and PROMINENT
+                Row(
                   children: [
-                    Icon(
-                      Icons.access_time_rounded,
-                      size: 14,
-                      color: AppTheme.textTertiary,
-                    ),
-                    const SizedBox(width: AppTheme.spacingXS),
-                    Expanded(
-                      child: Text(
-                        DateFormat('MMM d, y • h:mm a').format(booking.createdAt),
-                        style: theme.textTheme.bodySmall?.copyWith(
-                          color: AppTheme.textTertiary,
-                          fontSize: 12,
-                        ),
-                      ),
-                    ),
                     Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: AppTheme.spacingS,
-                        vertical: 2,
-                      ),
+                      width: 48,
+                      height: 48,
                       decoration: BoxDecoration(
                         color: AppTheme.primaryColor.withOpacity(0.1),
-                        borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                        shape: BoxShape.circle,
                       ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
+                      child: Icon(
+                        Icons.person,
+                        color: AppTheme.primaryColor,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacingM),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Icon(
-                            Icons.payment_rounded,
-                            size: 12,
-                            color: AppTheme.primaryColor,
-                          ),
-                          const SizedBox(width: 4),
                           Text(
-                            booking.paymentMethod.toUpperCase(),
+                            'Passenger Name',
                             style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppTheme.primaryColor,
+                              color: AppTheme.textSecondary,
                               fontSize: 11,
-                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            booking.passengerName,
+                            style: theme.textTheme.titleLarge?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                              fontSize: 20,
                             ),
                           ),
                         ],
@@ -1011,62 +876,344 @@ class _BookingCard extends StatelessWidget {
                     ),
                   ],
                 ),
-              ),
-              if (booking.luggage != null || (booking.bagCount != null && booking.bagCount! > 0)) ...[
-                const SizedBox(height: AppTheme.spacingS),
+
+                const SizedBox(height: AppTheme.spacingL),
+
+                // Route - Clear and Prominent
                 Container(
-                  padding: const EdgeInsets.all(AppTheme.spacingS),
+                  padding: const EdgeInsets.all(AppTheme.spacingM),
                   decoration: BoxDecoration(
-                    color: AppTheme.warningColor.withOpacity(0.05),
-                    borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                    color: AppTheme.surfaceColor,
+                    borderRadius: BorderRadius.circular(AppTheme.radiusM),
                     border: Border.all(
-                      color: AppTheme.warningColor.withOpacity(0.2),
+                      color: AppTheme.lightBorderColor,
                     ),
                   ),
                   child: Row(
                     children: [
-                      if (booking.bagCount != null && booking.bagCount! > 0) ...[
-                        Icon(
-                          Icons.shopping_bag_rounded,
-                          size: 16,
-                          color: AppTheme.warningColor,
-                        ),
-                        const SizedBox(width: AppTheme.spacingXS),
-                        Text(
-                          '${booking.bagCount} bag${booking.bagCount! > 1 ? 's' : ''}',
-                          style: theme.textTheme.bodySmall?.copyWith(
-                            color: AppTheme.warningColor,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                        if (booking.luggage != null) const SizedBox(width: AppTheme.spacingM),
-                      ],
-                      if (booking.luggage != null) ...[
-                        Icon(
-                          Icons.luggage_rounded,
-                          size: 16,
-                          color: AppTheme.warningColor,
-                        ),
-                        const SizedBox(width: AppTheme.spacingXS),
-                        Expanded(
-                          child: Text(
-                            booking.luggage!,
-                            style: theme.textTheme.bodySmall?.copyWith(
-                              color: AppTheme.warningColor,
-                              fontWeight: FontWeight.w500,
+                      Icon(
+                        Icons.route,
+                        color: AppTheme.primaryColor,
+                        size: 20,
+                      ),
+                      const SizedBox(width: AppTheme.spacingS),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Route',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondary,
+                                fontSize: 11,
+                              ),
                             ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '${booking.bus.from} → ${booking.bus.to}',
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimary,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ],
                         ),
-                      ],
+                      ),
                     ],
                   ),
                 ),
+
+                const SizedBox(height: AppTheme.spacingM),
+
+                // Key Info Grid - Seats, Amount, Payment
+                Row(
+                  children: [
+                    // Seats
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(AppTheme.spacingM),
+                        decoration: BoxDecoration(
+                          color: AppTheme.statusInfo.withOpacity(0.05),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.event_seat,
+                                  size: 16,
+                                  color: AppTheme.statusInfo,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Seats',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              booking.seatNumbers.map((s) => s.toString()).join(', '),
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.textPrimary,
+                                fontSize: 16,
+                              ),
+                            ),
+                            Text(
+                              '${booking.seatNumbers.length} ${booking.seatNumbers.length == 1 ? 'seat' : 'seats'}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondary,
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacingM),
+                    // Amount - MOST PROMINENT
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.all(AppTheme.spacingM),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.successColor.withOpacity(0.1),
+                              AppTheme.successColor.withOpacity(0.05),
+                            ],
+                          ),
+                          borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                          border: Border.all(
+                            color: AppTheme.successColor.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(
+                                  Icons.currency_rupee,
+                                  size: 16,
+                                  color: AppTheme.successColor,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  'Total Amount',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.textSecondary,
+                                    fontSize: 11,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Rs. ${NumberFormat('#,##0').format(booking.totalPrice)}',
+                              style: theme.textTheme.titleLarge?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.successColor,
+                                fontSize: 20,
+                              ),
+                            ),
+                            Text(
+                              '${booking.seatNumbers.length} × Rs. ${NumberFormat('#,##0').format(booking.bus.price)}',
+                              style: theme.textTheme.bodySmall?.copyWith(
+                                color: AppTheme.textSecondary,
+                                fontSize: 10,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+
+                const SizedBox(height: AppTheme.spacingM),
+
+                // Payment Method & Contact Info Row
+                Row(
+                  children: [
+                    Expanded(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppTheme.spacingM,
+                          vertical: AppTheme.spacingS,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceColor,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              booking.paymentMethod.toLowerCase() == 'cash'
+                                  ? Icons.money
+                                  : Icons.payment,
+                              size: 16,
+                              color: booking.paymentMethod.toLowerCase() == 'cash'
+                                  ? AppTheme.successColor
+                                  : AppTheme.statusInfo,
+                            ),
+                            const SizedBox(width: AppTheme.spacingXS),
+                            Text(
+                              'Payment: ${booking.paymentMethod.toUpperCase()}',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: AppTheme.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacingM),
+                    if (booking.contactNumber.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: AppTheme.spacingM,
+                          vertical: AppTheme.spacingS,
+                        ),
+                        decoration: BoxDecoration(
+                          color: AppTheme.surfaceColor,
+                          borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(
+                              Icons.phone,
+                              size: 16,
+                              color: AppTheme.primaryColor,
+                            ),
+                            const SizedBox(width: AppTheme.spacingXS),
+                            Text(
+                              booking.contactNumber,
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: AppTheme.textPrimary,
+                                fontWeight: FontWeight.w600,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+
+                // Luggage Info (if exists)
+                if (booking.luggage != null || (booking.bagCount != null && booking.bagCount! > 0)) ...[
+                  const SizedBox(height: AppTheme.spacingM),
+                  Container(
+                    padding: const EdgeInsets.all(AppTheme.spacingM),
+                    decoration: BoxDecoration(
+                      color: AppTheme.warningColor.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                      border: Border.all(
+                        color: AppTheme.warningColor.withOpacity(0.2),
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          Icons.luggage,
+                          size: 20,
+                          color: AppTheme.warningColor,
+                        ),
+                        const SizedBox(width: AppTheme.spacingS),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (booking.bagCount != null && booking.bagCount! > 0)
+                                Text(
+                                  '${booking.bagCount} bag${booking.bagCount! > 1 ? 's' : ''}',
+                                  style: theme.textTheme.bodyMedium?.copyWith(
+                                    color: AppTheme.warningColor,
+                                    fontWeight: FontWeight.w600,
+                                  ),
+                                ),
+                              if (booking.luggage != null) ...[
+                                if (booking.bagCount != null && booking.bagCount! > 0)
+                                  const SizedBox(height: 4),
+                                Text(
+                                  booking.luggage!,
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                // Booking Time
+                const SizedBox(height: AppTheme.spacingM),
+                Row(
+                  children: [
+                    Icon(
+                      Icons.access_time,
+                      size: 14,
+                      color: AppTheme.textTertiary,
+                    ),
+                    const SizedBox(width: AppTheme.spacingXS),
+                    Text(
+                      'Booked $timeAgo',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textTertiary,
+                        fontSize: 11,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacingS),
+                    Text(
+                      '•',
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textTertiary,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacingS),
+                    Text(
+                      DateFormat('MMM d, h:mm a').format(booking.createdAt),
+                      style: theme.textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textTertiary,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ],
+                ),
               ],
-            ],
+            ),
           ),
-        
+        ],
+      ),
     );
+  }
+
+  String _getTimeAgo(DateTime dateTime) {
+    final now = DateTime.now();
+    final difference = now.difference(dateTime);
+
+    if (difference.inDays > 0) {
+      return '${difference.inDays} day${difference.inDays > 1 ? 's' : ''} ago';
+    } else if (difference.inHours > 0) {
+      return '${difference.inHours} hour${difference.inHours > 1 ? 's' : ''} ago';
+    } else if (difference.inMinutes > 0) {
+      return '${difference.inMinutes} minute${difference.inMinutes > 1 ? 's' : ''} ago';
+    } else {
+      return 'Just now';
+    }
   }
 }
 
@@ -1090,20 +1237,29 @@ class _FilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.primaryColor
-              : Colors.grey.shade100,
+              ? AppTheme.accentColor.withOpacity(0.1)
+              : AppTheme.surfaceColor,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: selected
-                ? AppTheme.primaryColor
-                : Colors.grey.shade300,
-            width: selected ? 0 : 1,
+                ? AppTheme.accentColor
+                : AppTheme.lightBorderColor,
+            width: selected ? 2 : 1,
           ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppTheme.accentColor.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : Colors.black87,
+            color: selected ? AppTheme.accentColor : AppTheme.textPrimary,
             fontSize: 13,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           ),
@@ -1133,14 +1289,29 @@ class _DialogFilterChip extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
           color: selected
-              ? AppTheme.primaryColor
-              : Colors.grey.shade100,
+              ? AppTheme.accentColor.withOpacity(0.1)
+              : AppTheme.surfaceColor,
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: selected
+                ? AppTheme.accentColor
+                : AppTheme.lightBorderColor,
+            width: selected ? 2 : 1,
+          ),
+          boxShadow: selected
+              ? [
+                  BoxShadow(
+                    color: AppTheme.accentColor.withOpacity(0.2),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ]
+              : null,
         ),
         child: Text(
           label,
           style: TextStyle(
-            color: selected ? Colors.white : Colors.black87,
+            color: selected ? AppTheme.accentColor : AppTheme.textPrimary,
             fontSize: 14,
             fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
           ),
@@ -1149,52 +1320,4 @@ class _DialogFilterChip extends StatelessWidget {
     );
   }
 }
-
-class _InfoColumn extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-
-  const _InfoColumn({
-    required this.label,
-    required this.value,
-    required this.icon,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(
-              icon,
-              size: 12,
-              color: AppTheme.textTertiary,
-            ),
-            const SizedBox(width: 4),
-            Text(
-              label,
-              style: theme.textTheme.bodySmall?.copyWith(
-                color: AppTheme.textTertiary,
-                fontSize: 11,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: AppTheme.spacingXS),
-        Text(
-          value,
-          style: theme.textTheme.bodyMedium?.copyWith(
-            fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
-          ),
-        ),
-      ],
-    );
-  }
-}
-
 

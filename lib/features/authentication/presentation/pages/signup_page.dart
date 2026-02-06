@@ -10,6 +10,7 @@ import '../bloc/states/signup_state.dart';
 import '../../../../core/injection/injection.dart' as di;
 import '../../../../core/widgets/error_snackbar.dart';
 import '../../../../core/utils/bloc_extensions.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class SignupPage extends StatelessWidget {
   const SignupPage({super.key});
@@ -79,7 +80,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[100],
+      backgroundColor: AppTheme.surfaceColor,
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back),
@@ -249,7 +250,8 @@ class _SignupPageViewState extends State<_SignupPageView> {
                         keyboardType: TextInputType.emailAddress,
                         validator: (v) {
                           if (v == null || v.isEmpty) return 'Required';
-                          if (!v.contains('@')) return 'Invalid email';
+                          final trimmed = v.trim();
+                          if (!trimmed.contains('@')) return 'Invalid email';
                           return null;
                         },
                       ),
@@ -467,7 +469,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
                         obscureText: true,
                         validator: (v) {
                           if (v == null || v.isEmpty) return 'Required';
-                          if (v != passwordController.text) return 'Passwords do not match';
+                          if (v.trim() != passwordController.text.trim()) return 'Passwords do not match';
                           return null;
                         },
                       ),
@@ -507,7 +509,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
                                   ScaffoldMessenger.of(context).showSnackBar(
                                     const SnackBar(
                                       content: Text('Please upload required documents (Citizenship & Photo)'),
-                                      backgroundColor: Colors.red,
+                                      backgroundColor: AppTheme.errorColor,
                                     ),
                                   );
                                   return;
@@ -534,7 +536,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
                                         hasDeviceAccess: hasDeviceAccess,
                                         hasInternetAccess: hasInternetAccess,
                                         preferredBookingMethod: preferredBookingMethod,
-                                        password: passwordController.text,
+                                        password: passwordController.text.trim(),
                                         citizenshipFile: citizenshipFile!,
                                         photoFile: photoFile!,
                                         panVatNumber: panVatNumberController.text.isEmpty
@@ -660,7 +662,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
                     title,
                     style: Theme.of(context).textTheme.titleLarge?.copyWith(
                           fontWeight: FontWeight.bold,
-                          color: Colors.black87,
+                          color: AppTheme.textPrimary,
                           fontSize: 20,
                         ),
                   ),
@@ -697,11 +699,11 @@ class _SignupPageViewState extends State<_SignupPageView> {
         prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderSide: BorderSide(color: AppTheme.lightBorderColor!),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: Colors.grey[300]!),
+          borderSide: BorderSide(color: AppTheme.lightBorderColor!),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
@@ -719,7 +721,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
           borderSide: const BorderSide(color: Colors.red, width: 2),
         ),
         filled: true,
-        fillColor: Colors.grey[50],
+        fillColor: AppTheme.surfaceColor,
         contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
       ),
       validator: validator,
@@ -775,7 +777,7 @@ class _FilePickerField extends StatelessWidget {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('Error selecting file: $e'),
-              backgroundColor: Colors.red,
+              backgroundColor: AppTheme.errorColor,
             ),
           );
         }
@@ -785,18 +787,18 @@ class _FilePickerField extends StatelessWidget {
         decoration: BoxDecoration(
           border: Border.all(
             color: selectedFile != null 
-                ? Colors.green[400]! 
+                ? AppTheme.successColor! 
                 : Theme.of(context).colorScheme.primary.withOpacity(0.3),
             width: selectedFile != null ? 2 : 1.5,
           ),
           borderRadius: BorderRadius.circular(16),
           color: selectedFile != null 
-              ? Colors.green[50]! 
+              ? AppTheme.successColor.withOpacity(0.1)! 
               : Colors.grey[50],
           boxShadow: selectedFile != null
               ? [
                   BoxShadow(
-                    color: Colors.green.withOpacity(0.1),
+                    color: AppTheme.successColor.withOpacity(0.1),
                     blurRadius: 8,
                     offset: const Offset(0, 4),
                   ),
@@ -809,14 +811,14 @@ class _FilePickerField extends StatelessWidget {
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
                 color: selectedFile != null
-                    ? Colors.green[100]
+                    ? AppTheme.successColor.withOpacity(0.1)
                     : Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Icon(
                 icon,
                 color: selectedFile != null
-                    ? Colors.green[700]
+                    ? AppTheme.successColor
                     : Theme.of(context).colorScheme.primary,
                 size: 24,
               ),
@@ -830,7 +832,7 @@ class _FilePickerField extends StatelessWidget {
                     label,
                     style: TextStyle(
                       fontSize: 12,
-                      color: Colors.grey[600],
+                      color: AppTheme.textSecondary,
                       fontWeight: FontWeight.w600,
                       letterSpacing: 0.5,
                     ),
@@ -842,7 +844,7 @@ class _FilePickerField extends StatelessWidget {
                         : 'Tap to select file',
                     style: TextStyle(
                       fontSize: 15,
-                      color: selectedFile != null ? Colors.black87 : Colors.grey[600],
+                      color: selectedFile != null ? AppTheme.textPrimary : AppTheme.textSecondary,
                       fontWeight: selectedFile != null ? FontWeight.w600 : FontWeight.normal,
                     ),
                     overflow: TextOverflow.ellipsis,
@@ -856,14 +858,14 @@ class _FilePickerField extends StatelessWidget {
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
                 color: selectedFile != null
-                    ? Colors.green[100]
+                    ? AppTheme.successColor.withOpacity(0.1)
                     : Theme.of(context).colorScheme.primary.withOpacity(0.1),
                 shape: BoxShape.circle,
               ),
               child: Icon(
                 selectedFile != null ? Icons.check_circle : Icons.upload_file,
                 color: selectedFile != null
-                    ? Colors.green[700]
+                    ? AppTheme.successColor
                     : Theme.of(context).colorScheme.primary,
                 size: 24,
               ),

@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../bloc/notification_bloc.dart';
 import '../bloc/events/notification_event.dart';
 import '../bloc/states/notification_state.dart';
 import '../../../../core/injection/injection.dart' as di;
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/error_state_widget.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/app_bar.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
+import '../../../../core/widgets/back_button_handler.dart';
+import '../../../../core/theme/app_theme.dart';
 
 class NotificationsPage extends StatelessWidget {
   const NotificationsPage({super.key});
@@ -25,19 +30,11 @@ class _NotificationsView extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('Notifications'),
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
-          onPressed: () {
-            if (context.canPop()) {
-              context.pop();
-            } else {
-              context.go('/dashboard');
-            }
-          },
-        ),
+    return BackButtonHandler(
+      enableDoubleBackToExit: false,
+      child: Scaffold(
+      appBar: AppAppBar(
+        title: 'Notifications',
         actions: [
           BlocBuilder<NotificationBloc, NotificationState>(
             builder: (context, state) {
@@ -82,57 +79,29 @@ class _NotificationsView extends StatelessWidget {
               state is NotificationDeleted ||
               state is AllNotificationsDeleted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(
-                content: Text('Operation successful'),
-                backgroundColor: Colors.green,
-              ),
+              SuccessSnackBar(message: 'Operation successful'),
             );
             context.read<NotificationBloc>().add(GetNotificationsEvent());
           }
         },
         builder: (context, state) {
           if (state is NotificationLoading) {
-            return const Center(child: CircularProgressIndicator());
+            return const SkeletonList(itemCount: 6, itemHeight: 80);
           }
 
           if (state is NotificationError) {
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
-                  const SizedBox(height: 16),
-                  Text(
-                    state.message,
-                    textAlign: TextAlign.center,
-                    style: TextStyle(color: Colors.red[700]),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: () {
-                      context.read<NotificationBloc>().add(GetNotificationsEvent());
-                    },
-                    child: const Text('Retry'),
-                  ),
-                ],
-              ),
+            return ErrorStateWidget(
+              message: state.message,
+              onRetry: () => context.read<NotificationBloc>().add(GetNotificationsEvent()),
             );
           }
 
           if (state is NotificationsLoaded) {
             if (state.notifications.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(Icons.notifications_none, size: 64, color: Colors.grey[400]),
-                    const SizedBox(height: 16),
-                    Text(
-                      'No notifications',
-                      style: TextStyle(color: Colors.grey[600]),
-                    ),
-                  ],
-                ),
+              return const EmptyStateWidget(
+                icon: Icons.notifications_none,
+                title: 'No notifications',
+                description: 'You are all caught up.',
               );
             }
 
@@ -230,6 +199,8 @@ class _NotificationsView extends StatelessWidget {
           return const Center(child: Text('No data'));
         },
       ),
+        ),
+      
     );
   }
 
@@ -247,11 +218,11 @@ class _NotificationsView extends StatelessWidget {
   Color _getTypeColor(String type) {
     switch (type.toLowerCase()) {
       case 'booking':
-        return Colors.blue;
+        return AppTheme.statusInfo;
       case 'cancellation':
-        return Colors.orange;
+        return AppTheme.warningColor;
       default:
-        return Colors.grey;
+        return AppTheme.textSecondary;
     }
   }
 }

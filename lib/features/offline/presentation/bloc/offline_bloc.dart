@@ -3,6 +3,7 @@ import 'package:agentapp/features/offline/presentation/bloc/states/offline_state
 import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../domain/entities/offline_entity.dart';
 import '../../domain/usecases/get_offline_queue.dart';
 import '../../domain/usecases/add_to_offline_queue.dart';
@@ -32,12 +33,7 @@ class OfflineBloc extends Bloc<OfflineEvent, OfflineState> {
     final result = await getOfflineQueue();
     if (result is Error<List<OfflineQueueItemEntity>>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(OfflineError(errorMessage));
     } else if (result is Success<List<OfflineQueueItemEntity>>) {
       final queue = result.data;
@@ -54,12 +50,7 @@ class OfflineBloc extends Bloc<OfflineEvent, OfflineState> {
     final result = await addToOfflineQueue(bookingData: event.bookingData);
     if (result is Error<OfflineQueueItemEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(OfflineError(errorMessage));
     } else if (result is Success<OfflineQueueItemEntity>) {
       emit(AddedToOfflineQueue(result.data));
@@ -74,12 +65,7 @@ class OfflineBloc extends Bloc<OfflineEvent, OfflineState> {
     final result = await syncOfflineBookings();
     if (result is Error<OfflineSyncResultEntity>) {
       final failure = result.failure;
-      String errorMessage;
-      if (failure is AuthenticationFailure) {
-        errorMessage = 'Authentication required. Please login again.';
-      } else {
-        errorMessage = failure.message;
-      }
+      final errorMessage = ErrorMessageSanitizer.sanitize(failure);
       emit(OfflineError(errorMessage));
     } else if (result is Success<OfflineSyncResultEntity>) {
       emit(OfflineBookingsSynced(result.data));

@@ -30,6 +30,7 @@ class CreateBookingEvent extends BookingEvent {
   final String? luggage;
   final int? bagCount;
   final String paymentMethod;
+  final String? holdId; // Optional wallet hold ID
 
   const CreateBookingEvent({
     required this.busId,
@@ -42,6 +43,7 @@ class CreateBookingEvent extends BookingEvent {
     this.luggage,
     this.bagCount,
     required this.paymentMethod,
+    this.holdId,
   });
 
   @override
@@ -56,6 +58,7 @@ class CreateBookingEvent extends BookingEvent {
         luggage,
         bagCount,
         paymentMethod,
+        holdId,
       ];
 }
 

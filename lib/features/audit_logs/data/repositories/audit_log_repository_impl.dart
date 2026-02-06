@@ -1,6 +1,7 @@
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../../../core/session/session_manager.dart';
 import '../../domain/entities/audit_log_entity.dart';
 import '../../domain/repositories/audit_log_repository.dart';
@@ -54,9 +55,9 @@ class AuditLogRepositoryImpl implements AuditLogRepository {
     } on NetworkException catch (e) {
       return Error(NetworkFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 }

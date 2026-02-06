@@ -6,8 +6,11 @@ import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../../../core/injection/injection.dart' as di;
 import '../../../../core/widgets/enhanced_card.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/app_bar.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/back_button_handler.dart';
 import '../bloc/counter_request_bloc.dart';
 import '../bloc/events/counter_request_event.dart';
 import '../bloc/states/counter_request_state.dart';
@@ -19,13 +22,11 @@ class CounterRequestsListPage extends StatelessWidget {
   Widget build(BuildContext context) {
     return BlocProvider(
       create: (context) => di.sl<CounterRequestBloc>()..add(const GetCounterRequestsEvent()),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('My Requests'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
-          ),
+      child: BackButtonHandler(
+        enableDoubleBackToExit: false,
+        child: Scaffold(
+        appBar: AppAppBar(
+          title: 'My Requests',
           actions: [
             IconButton(
               icon: const Icon(Icons.refresh),
@@ -111,39 +112,12 @@ class CounterRequestsListPage extends StatelessWidget {
             }
 
             if (state.requests.isEmpty) {
-              return Center(
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.inbox_outlined,
-                      size: 64,
-                      color: Colors.grey[400],
-                    ),
-                    const SizedBox(height: AppTheme.spacingM),
-                    Text(
-                      'No Requests Yet',
-                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                    ),
-                    const SizedBox(height: AppTheme.spacingS),
-                    Text(
-                      'Request access to owner buses to start booking',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.grey[600],
-                          ),
-                    ),
-                    const SizedBox(height: AppTheme.spacingL),
-                    ElevatedButton.icon(
-                      onPressed: () {
-                        context.push('/counter/request-bus-access');
-                      },
-                      icon: const Icon(Icons.add),
-                      label: const Text('Request Bus Access'),
-                    ),
-                  ],
-                ),
+              return EmptyStateWidget(
+                icon: Icons.inbox_outlined,
+                title: 'No Requests Yet',
+                description: 'Request access to owner buses to start booking.',
+                actionLabel: 'Request Bus Access',
+                onAction: () => context.push('/counter/request-bus-access'),
               );
             }
 
@@ -167,7 +141,7 @@ class CounterRequestsListPage extends StatelessWidget {
                       _RequestSectionHeader(
                         title: 'Pending Requests',
                         count: pendingRequests.length,
-                        color: Colors.orange,
+                        color: AppTheme.warningColor,
                       ),
                       const SizedBox(height: AppTheme.spacingS),
                       ...pendingRequests.map((request) => Padding(
@@ -182,7 +156,7 @@ class CounterRequestsListPage extends StatelessWidget {
                       _RequestSectionHeader(
                         title: 'Approved Requests',
                         count: approvedRequests.length,
-                        color: Colors.green,
+                        color: AppTheme.successColor,
                       ),
                       const SizedBox(height: AppTheme.spacingS),
                       ...approvedRequests.map((request) => Padding(
@@ -197,7 +171,7 @@ class CounterRequestsListPage extends StatelessWidget {
                       _RequestSectionHeader(
                         title: 'Rejected Requests',
                         count: rejectedRequests.length,
-                        color: Colors.red,
+                        color: AppTheme.errorColor,
                       ),
                       const SizedBox(height: AppTheme.spacingS),
                       ...rejectedRequests.map((request) => Padding(
@@ -212,7 +186,7 @@ class CounterRequestsListPage extends StatelessWidget {
                       _RequestSectionHeader(
                         title: 'Expired Requests',
                         count: expiredRequests.length,
-                        color: Colors.grey,
+                        color: AppTheme.textSecondary,
                       ),
                       const SizedBox(height: AppTheme.spacingS),
                       ...expiredRequests.map((request) => Padding(
@@ -235,6 +209,8 @@ class CounterRequestsListPage extends StatelessWidget {
           label: const Text('New Request'),
         ),
       ),
+        ),
+      
     );
   }
 }
@@ -251,10 +227,6 @@ class _RequestSectionHeader extends StatelessWidget {
   });
 
   Color _getTextColor() {
-    if (color == Colors.orange) return Colors.orange[700]!;
-    if (color == Colors.green) return Colors.green[700]!;
-    if (color == Colors.red) return Colors.red[700]!;
-    if (color == Colors.grey) return Colors.grey[700]!;
     return color;
   }
 
@@ -325,7 +297,7 @@ class _RequestCard extends StatelessWidget {
                     Text(
                       bus.vehicleNumber,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[600],
+                            color: AppTheme.textSecondary,
                           ),
                     ),
                   ],
@@ -353,7 +325,7 @@ class _RequestCard extends StatelessWidget {
           // Route Info
           Row(
             children: [
-              Icon(Icons.route, size: 16, color: Colors.grey[600]),
+              Icon(Icons.route, size: 16, color: AppTheme.textSecondary),
               const SizedBox(width: AppTheme.spacingXS),
               Text(
                 '${bus.from} → ${bus.to}',
@@ -366,14 +338,14 @@ class _RequestCard extends StatelessWidget {
           // Date & Time
           Row(
             children: [
-              Icon(Icons.calendar_today, size: 16, color: Colors.grey[600]),
+              Icon(Icons.calendar_today, size: 16, color: AppTheme.textSecondary),
               const SizedBox(width: AppTheme.spacingXS),
               Text(
                 DateFormat('MMM dd, yyyy').format(bus.date),
                 style: Theme.of(context).textTheme.bodySmall,
               ),
               const SizedBox(width: AppTheme.spacingM),
-              Icon(Icons.access_time, size: 16, color: Colors.grey[600]),
+              Icon(Icons.access_time, size: 16, color: AppTheme.textSecondary),
               const SizedBox(width: AppTheme.spacingXS),
               Text(
                 bus.time,
@@ -387,18 +359,18 @@ class _RequestCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(AppTheme.spacingS),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: AppTheme.statusInfo.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
-                Icon(Icons.event_seat, size: 16, color: Colors.blue.shade700),
+                Icon(Icons.event_seat, size: 16, color: AppTheme.statusInfo),
                 const SizedBox(width: AppTheme.spacingXS),
                 Expanded(
                   child: Text(
                     'Requested: ${request.requestedSeats.join(', ')}',
                     style: TextStyle(
-                      color: Colors.blue.shade700,
+                      color: AppTheme.statusInfo,
                       fontSize: 12,
                     ),
                   ),
@@ -413,18 +385,18 @@ class _RequestCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: AppTheme.successColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle, size: 16, color: Colors.green.shade700),
+                  Icon(Icons.check_circle, size: 16, color: AppTheme.successColor),
                   const SizedBox(width: AppTheme.spacingXS),
                   Expanded(
                     child: Text(
                       'Approved: ${request.approvedSeats!.map((s) => s.toString()).join(', ')}',
                       style: TextStyle(
-                        color: Colors.green.shade700,
+                        color: AppTheme.successColor,
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -441,19 +413,19 @@ class _RequestCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
-                color: Colors.grey.shade50,
+                color: AppTheme.surfaceColor,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.message, size: 16, color: Colors.grey[600]),
+                  Icon(Icons.message, size: 16, color: AppTheme.textSecondary),
                   const SizedBox(width: AppTheme.spacingXS),
                   Expanded(
                     child: Text(
                       request.message!,
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: Colors.grey[700],
+                            color: AppTheme.textPrimary,
                           ),
                     ),
                   ),
@@ -466,12 +438,12 @@ class _RequestCard extends StatelessWidget {
           const SizedBox(height: AppTheme.spacingS),
           Row(
             children: [
-              Icon(Icons.schedule, size: 14, color: Colors.grey[500]),
+              Icon(Icons.schedule, size: 14, color: AppTheme.textSecondary),
               const SizedBox(width: AppTheme.spacingXS),
               Text(
                 'Created: ${DateFormat('MMM dd, yyyy HH:mm').format(request.createdAt)}',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Colors.grey[600],
+                      color: AppTheme.textSecondary,
                       fontSize: 11,
                     ),
               ),
@@ -481,12 +453,12 @@ class _RequestCard extends StatelessWidget {
             const SizedBox(height: 4),
             Row(
               children: [
-                Icon(Icons.timer_off, size: 14, color: Colors.grey[500]),
+                Icon(Icons.timer_off, size: 14, color: AppTheme.textSecondary),
                 const SizedBox(width: AppTheme.spacingXS),
                 Text(
                   'Expires: ${DateFormat('MMM dd, yyyy HH:mm').format(request.expiresAt!)}',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: Colors.grey[600],
+                        color: AppTheme.textSecondary,
                         fontSize: 11,
                       ),
                 ),
@@ -501,15 +473,15 @@ class _RequestCard extends StatelessWidget {
   Color _getStatusColor(String status) {
     switch (status.toUpperCase()) {
       case 'PENDING':
-        return Colors.orange;
+        return AppTheme.warningColor;
       case 'APPROVED':
-        return Colors.green;
+        return AppTheme.successColor;
       case 'REJECTED':
-        return Colors.red;
+        return AppTheme.errorColor;
       case 'EXPIRED':
-        return Colors.grey;
+        return AppTheme.textSecondary;
       default:
-        return Colors.grey;
+        return AppTheme.textSecondary;
     }
   }
 

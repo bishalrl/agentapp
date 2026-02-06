@@ -1,6 +1,7 @@
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/errors/failures.dart';
 import '../../../../core/utils/result.dart';
+import '../../../../core/utils/error_message_sanitizer.dart';
 import '../../../../core/session/session_manager.dart';
 import '../../domain/entities/booking_entity.dart';
 import '../../domain/repositories/booking_repository.dart';
@@ -66,11 +67,11 @@ class BookingRepositoryImpl implements BookingRepository {
       return Error(NetworkFailure(e.message));
     } on ServerException catch (e) {
       print('   ❌ ServerException: ${e.message}');
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e, stackTrace) {
       print('   ❌ Unexpected error: $e');
       print('   StackTrace: $stackTrace');
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
   
@@ -97,9 +98,9 @@ class BookingRepositoryImpl implements BookingRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
   
@@ -115,6 +116,7 @@ class BookingRepositoryImpl implements BookingRepository {
     String? luggage,
     int? bagCount,
     required String paymentMethod,
+    String? holdId, // Optional wallet hold ID
   }) async {
     print('📦 BookingRepositoryImpl.createBooking: Starting');
     
@@ -142,15 +144,16 @@ class BookingRepositoryImpl implements BookingRepository {
         luggage: luggage,
         bagCount: bagCount,
         paymentMethod: paymentMethod,
+        holdId: holdId,
         token: token,
       );
       return Success(booking);
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
   
@@ -228,7 +231,7 @@ class BookingRepositoryImpl implements BookingRepository {
       if (cachedBookings.isNotEmpty) {
         return Success(cachedBookings);
       }
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
       // Check if it's a network-related error
       final errorString = e.toString().toLowerCase();
@@ -247,7 +250,7 @@ class BookingRepositoryImpl implements BookingRepository {
       if (cachedBookings.isNotEmpty) {
         return Success(cachedBookings);
       }
-      return Error(ServerFailure('Failed to get bookings: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
   
@@ -271,9 +274,9 @@ class BookingRepositoryImpl implements BookingRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
   
@@ -297,9 +300,9 @@ class BookingRepositoryImpl implements BookingRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -328,9 +331,9 @@ class BookingRepositoryImpl implements BookingRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 
@@ -361,9 +364,9 @@ class BookingRepositoryImpl implements BookingRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
   
@@ -387,9 +390,9 @@ class BookingRepositoryImpl implements BookingRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
   
@@ -413,9 +416,9 @@ class BookingRepositoryImpl implements BookingRepository {
     } on AuthenticationException catch (e) {
       return Error(AuthenticationFailure(e.message));
     } on ServerException catch (e) {
-      return Error(ServerFailure(e.message));
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
-      return Error(ServerFailure('Unexpected error: ${e.toString()}'));
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }
 }

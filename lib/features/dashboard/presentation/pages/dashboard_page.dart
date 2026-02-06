@@ -12,8 +12,9 @@ import '../../../../core/widgets/main_drawer.dart';
 import '../../../../core/widgets/enhanced_card.dart';
 import '../../../../core/widgets/stat_card.dart';
 import '../../../../core/theme/app_theme.dart';
-import '../../../../core/animations/scroll_animations.dart';
-import '../../../../core/animations/touch_animations.dart';
+import '../../../authentication/presentation/bloc/auth_bloc.dart';
+import '../../../authentication/presentation/bloc/events/auth_event.dart';
+import '../../../authentication/presentation/bloc/states/auth_state.dart' as auth;
 
 class DashboardPage extends StatelessWidget {
   const DashboardPage({super.key});
@@ -46,11 +47,44 @@ class DashboardPage extends StatelessWidget {
               icon: const Icon(Icons.person),
               onPressed: () => context.go('/profile'),
             ),
-            IconButton(
-              icon: const Icon(Icons.logout),
-              onPressed: () {
-                context.go('/login');
+            BlocListener<AuthBloc, auth.AuthState>(
+              listener: (context, state) {
+                if (state.isAuthenticated == false && state.isLoading == false) {
+                  // Navigate to login after successful logout
+                  context.go('/login');
+                }
               },
+              child: IconButton(
+                icon: const Icon(Icons.logout),
+                tooltip: 'Logout',
+                onPressed: () {
+                  // Show confirmation dialog
+                  showDialog(
+                    context: context,
+                    builder: (dialogContext) => AlertDialog(
+                      title: const Text('Logout'),
+                      content: const Text('Are you sure you want to logout?'),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(dialogContext).pop(),
+                          child: const Text('Cancel'),
+                        ),
+                        ElevatedButton(
+                          onPressed: () {
+                            Navigator.of(dialogContext).pop();
+                            context.read<AuthBloc>().add(const LogoutEvent());
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppTheme.errorColor,
+                            foregroundColor: Colors.white,
+                          ),
+                          child: const Text('Logout'),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              ),
             ),
           ],
         ),

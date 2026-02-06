@@ -22,6 +22,7 @@ abstract class BookingRemoteDataSource {
     String? luggage,
     int? bagCount,
     required String paymentMethod,
+    String? holdId, // Optional wallet hold ID
     required String token,
   });
   Future<List<BookingModel>> getBookings({
@@ -91,7 +92,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException('Failed to get available buses: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
   
@@ -176,7 +177,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
       rethrow;
     } catch (e) {
       print('   ❌ BookingRemoteDataSource.getBusDetails: Error: $e');
-      throw ServerException('Failed to get bus details: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
   
@@ -192,6 +193,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     String? luggage,
     int? bagCount,
     required String paymentMethod,
+    String? holdId, // Optional wallet hold ID
     required String token,
   }) async {
     try {
@@ -263,6 +265,9 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
       if (bagCount != null && bagCount > 0) {
         body['bagCount'] = bagCount;
       }
+      if (holdId != null && holdId.isNotEmpty) {
+        body['holdId'] = holdId;
+      }
       
       final response = await apiClient.post(
         ApiConstants.counterBookings,
@@ -330,7 +335,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
       rethrow;
     } catch (e) {
       print('❌ BookingRemoteDataSource.createBooking: Unexpected error: $e');
-      throw ServerException('Failed to create booking: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
   
@@ -441,7 +446,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
           'Network connection error. Please check your internet connection and try again.'
         );
       }
-      throw ServerException('Failed to get bookings: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
   
@@ -471,7 +476,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException('Failed to get booking details: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
   
@@ -493,7 +498,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException('Failed to cancel booking: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 
@@ -520,7 +525,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException('Failed to cancel multiple bookings: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 
@@ -549,7 +554,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException('Failed to update booking status: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
   
@@ -597,7 +602,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException('Failed to lock seats: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
   
@@ -644,7 +649,7 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
     } on ServerException {
       rethrow;
     } catch (e) {
-      throw ServerException('Failed to unlock seats: ${e.toString()}');
+      throw ServerException('Request failed. Please try again.');
     }
   }
 }

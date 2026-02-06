@@ -6,10 +6,24 @@ import '../bloc/booking_bloc.dart';
 import '../bloc/events/booking_event.dart';
 import '../bloc/states/booking_state.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/empty_state_widget.dart';
+import '../../../../core/widgets/app_bar.dart';
+import '../../../../core/widgets/skeleton_loader.dart';
 import '../../../../core/widgets/enhanced_card.dart';
+import '../../../../core/widgets/progress_indicator.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../../../core/widgets/back_button_handler.dart';
 import '../../../../core/injection/injection.dart' as di;
 import '../../domain/entities/booking_entity.dart';
+import '../../../dashboard/presentation/bloc/dashboard_bloc.dart';
+import '../../../dashboard/presentation/bloc/events/dashboard_event.dart';
+import '../../../dashboard/presentation/bloc/states/dashboard_state.dart';
+import '../../../wallet/presentation/bloc/wallet_bloc.dart';
+import '../../../wallet/presentation/bloc/events/wallet_event.dart';
+import '../../../wallet/domain/usecases/create_wallet_hold.dart';
+import '../../../wallet/domain/usecases/release_wallet_hold.dart';
+import '../../../../core/utils/result.dart';
+import '../../../../core/errors/failures.dart';
 
 class CreateBookingPage extends StatefulWidget {
   const CreateBookingPage({super.key});
@@ -45,29 +59,43 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
 
   @override
   Widget build(BuildContext context) {
-    return BlocProvider(
-      // Use a fresh BookingBloc instance from DI to avoid using a closed bloc
-      create: (context) => di.sl<BookingBloc>()..add(const GetAvailableBusesEvent()),
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Create Booking'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/bookings');
-              }
-            },
-          ),
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider(
+          // Use a fresh BookingBloc instance from DI to avoid using a closed bloc
+          create: (context) => di.sl<BookingBloc>()..add(const GetAvailableBusesEvent()),
+        ),
+        BlocProvider(
+          create: (context) => di.sl<DashboardBloc>()..add(const GetDashboardEvent()),
+        ),
+        BlocProvider(
+          create: (context) => di.sl<WalletBloc>()..add(GetTransactionsEvent()),
+        ),
+      ],
+      child: BackButtonHandler(
+        enableDoubleBackToExit: false,
+        child: Scaffold(
+        appBar: AppAppBar(
+          title: 'Create Booking',
         ),
         body: BlocConsumer<BookingBloc, BookingState>(
           listener: (context, state) {
             if (state.errorMessage != null && state.errorMessage!.isNotEmpty) {
+              // If booking failed and we have a holdId, release it
+              final errorMessage = state.errorMessage!;
+              final isHoldError = errorMessage.toLowerCase().contains('hold') ||
+                  errorMessage.toLowerCase().contains('invalid') ||
+                  errorMessage.toLowerCase().contains('expired');
+              
+              if (isHoldError) {
+                // Try to extract holdId from error or get from last booking attempt
+                // For now, we'll show error and let user retry
+                // In production, you might want to track the holdId in state
+              }
+              
               ScaffoldMessenger.of(context).showSnackBar(
                 ErrorSnackBar(
-                  message: state.errorMessage!,
+                  message: errorMessage,
                   errorSource: 'Booking',
                 ),
               );
@@ -79,10 +107,12 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
             }
             if (state.createdBooking != null) {
               ScaffoldMessenger.of(context).showSnackBar(
-                 SuccessSnackBar(
-                  message: 'Booking created successfully!',
-                ),
+                SuccessSnackBar(message: 'Booking created successfully! Amount deducted from wallet.'),
               );
+              
+              // Refresh dashboard to update wallet balance
+              context.read<DashboardBloc>().add(const GetDashboardEvent());
+              
               Future.delayed(const Duration(milliseconds: 500), () {
                 if (context.mounted) {
                   context.pop();
@@ -92,7 +122,7 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
           },
           builder: (context, state) {
             if (state.isLoading && state.buses.isEmpty) {
-              return const Center(child: CircularProgressIndicator());
+              return const SkeletonList(itemCount: 5, itemHeight: 100);
             }
 
             return SingleChildScrollView(
@@ -102,6 +132,20 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // Step Indicator
+                    StepProgressIndicator(
+                      currentStep: _selectedBusId == null 
+                          ? 1 
+                          : (_selectedSeats.isEmpty 
+                              ? 2 
+                              : (_passengerNameController.text.isEmpty || _contactNumberController.text.isEmpty
+                                  ? 3
+                                  : 4)),
+                      totalSteps: 4,
+                      stepLabels: const ['Select Bus', 'Choose Seats', 'Passenger Info', 'Review & Pay'],
+                    ),
+                    const SizedBox(height: AppTheme.spacingL),
+                    
                     // Step 1: Bus Selection
                     _BusSelectionSection(
                       buses: state.buses,
@@ -118,65 +162,84 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                     
                     // Step 2: Seat Selection (only if bus is selected)
                     if (_selectedBusId != null && state.selectedBus != null) ...[
-                      // Check hasAccess before rendering seat map
-                      if (state.selectedBus!.hasAccess == false || 
-                          (state.selectedBus!.hasAccess == null && 
-                           state.selectedBus!.hasNoAccess == true)) ...[
-                        // No access - show message instead of seat map
-                        EnhancedCard(
-                          child: Container(
-                            padding: const EdgeInsets.all(AppTheme.spacingL),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.block,
-                                  size: 64,
-                                  color: Colors.red[400],
+                      // Check wallet balance - if sufficient, allow booking even without access
+                      BlocBuilder<DashboardBloc, DashboardState>(
+                        builder: (context, dashboardState) {
+                          final dashboard = dashboardState.dashboard;
+                          final walletBalance = dashboard?.counter.walletBalance ?? 0.0;
+                          final bus = state.selectedBus!;
+                          final estimatedPrice = bus.price; // Estimate for one seat
+                          final hasSufficientBalance = walletBalance >= estimatedPrice;
+                          final hasAccess = bus.hasAccess == true;
+                          final hasNoAccess = bus.hasAccess == false || 
+                                             (bus.hasAccess == null && bus.hasNoAccess == true);
+                          
+                          // If no access AND insufficient balance, show message
+                          if (hasNoAccess && !hasSufficientBalance) {
+                            return EnhancedCard(
+                              child: Container(
+                                padding: const EdgeInsets.all(AppTheme.spacingL),
+                                child: Column(
+                                  children: [
+                                    Icon(
+                                      Icons.block,
+                                      size: 64,
+                                      color: AppTheme.errorColor,
+                                    ),
+                                    const SizedBox(height: AppTheme.spacingM),
+                                    Text(
+                                      'No Access',
+                                      style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                            color: AppTheme.errorColor,
+                                          ),
+                                    ),
+                                    const SizedBox(height: AppTheme.spacingS),
+                                    Text(
+                                      'You do not have access to this bus. Add money to your wallet (Rs. ${NumberFormat('#,##0.00').format(estimatedPrice)} minimum) to book seats.',
+                                      textAlign: TextAlign.center,
+                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            color: AppTheme.textPrimary,
+                                          ),
+                                    ),
+                                    const SizedBox(height: AppTheme.spacingM),
+                                    ElevatedButton.icon(
+                                      onPressed: () => context.go('/wallet'),
+                                      icon: const Icon(Icons.account_balance_wallet),
+                                      label: const Text('Add Money to Wallet'),
+                                    ),
+                                  ],
                                 ),
-                                const SizedBox(height: AppTheme.spacingM),
-                                Text(
-                                  'No Access',
-                                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                        color: Colors.red[700],
-                                      ),
-                                ),
-                                const SizedBox(height: AppTheme.spacingS),
-                                Text(
-                                  state.selectedBus!.hasAccess == false
-                                      ? 'You do not have access to this bus. Please request access first.'
-                                      : 'You do not have permission to book seats on this bus.',
-                                  textAlign: TextAlign.center,
-                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        color: Colors.grey[700],
-                                      ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ] else ...[
-                        // Has access - show seat selection
-                        _SeatSelectionSection(
-                          bus: state.selectedBus!,
-                          selectedSeats: _selectedSeats,
-                          onSeatsChanged: (seats) {
-                            setState(() {
-                              _selectedSeats = seats;
-                            });
-                          },
-                          onLockSeats: (seats) {
-                            context.read<BookingBloc>().add(
-                              LockSeatsEvent(busId: _selectedBusId!, seatNumbers: seats),
+                              ),
                             );
-                          },
-                          onUnlockSeats: (seats) {
-                            context.read<BookingBloc>().add(
-                              UnlockSeatsEvent(busId: _selectedBusId!, seatNumbers: seats),
+                          }
+                          
+                          // Show seat map if: has access OR has sufficient wallet balance
+                          if (hasAccess || hasSufficientBalance) {
+                            return _SeatSelectionSection(
+                              bus: state.selectedBus!,
+                              selectedSeats: _selectedSeats,
+                              onSeatsChanged: (seats) {
+                                setState(() {
+                                  _selectedSeats = seats;
+                                });
+                              },
+                              onLockSeats: (seats) {
+                                context.read<BookingBloc>().add(
+                                  LockSeatsEvent(busId: _selectedBusId!, seatNumbers: seats),
+                                );
+                              },
+                              onUnlockSeats: (seats) {
+                                context.read<BookingBloc>().add(
+                                  UnlockSeatsEvent(busId: _selectedBusId!, seatNumbers: seats),
+                                );
+                              },
                             );
-                          },
-                        ),
-                      ],
+                          }
+                          
+                          return const SizedBox.shrink();
+                        },
+                      ),
                     ],
                     
                     if (_selectedBusId != null && state.selectedBus != null) ...[
@@ -221,29 +284,53 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                       
                       // Booking Summary
                       if (_selectedSeats.isNotEmpty)
-                        _BookingSummarySection(
-                          bus: state.selectedBus!,
-                          selectedSeats: _selectedSeats,
-                          paymentMethod: _selectedPaymentMethod,
+                        BlocBuilder<DashboardBloc, DashboardState>(
+                          builder: (context, dashboardState) {
+                            final walletBalance = dashboardState.dashboard?.counter.walletBalance ?? 0.0;
+                            return _BookingSummarySection(
+                              bus: state.selectedBus!,
+                              selectedSeats: _selectedSeats,
+                              paymentMethod: _selectedPaymentMethod,
+                              walletBalance: walletBalance,
+                            );
+                          },
                         ),
                       const SizedBox(height: 24),
                       
                       // Submit Button
-                      SizedBox(
-                        width: double.infinity,
-                        child: ElevatedButton(
-                          onPressed: state.isLoading ? null : () => _submitBooking(context, state),
-                          style: ElevatedButton.styleFrom(
-                            padding: const EdgeInsets.symmetric(vertical: 16),
-                          ),
-                          child: state.isLoading
-                              ? const SizedBox(
-                                  width: 20,
-                                  height: 20,
-                                  child: CircularProgressIndicator(strokeWidth: 2),
-                                )
-                              : const Text('Create Booking'),
-                        ),
+                      BlocBuilder<DashboardBloc, DashboardState>(
+                        builder: (context, dashboardState) {
+                          final isFormValid = _isFormValid(state, context);
+                          final walletBalance = dashboardState.dashboard?.counter.walletBalance ?? 0.0;
+                          final totalPrice = state.selectedBus != null 
+                              ? state.selectedBus!.price * _selectedSeats.length 
+                              : 0.0;
+                          final hasInsufficientBalance = totalPrice > 0 && walletBalance < totalPrice;
+                          
+                          return SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              onPressed: (isFormValid && !state.isLoading && !hasInsufficientBalance) 
+                                  ? () => _submitBooking(context, state)
+                                  : null,
+                              style: ElevatedButton.styleFrom(
+                                padding: const EdgeInsets.symmetric(vertical: 16),
+                                backgroundColor: hasInsufficientBalance 
+                                    ? AppTheme.errorColor.withOpacity(0.5)
+                                    : null,
+                              ),
+                              child: state.isLoading
+                                  ? const SizedBox(
+                                      width: 20,
+                                      height: 20,
+                                      child: CircularProgressIndicator(strokeWidth: 2),
+                                    )
+                                  : Text(hasInsufficientBalance 
+                                      ? 'Insufficient Wallet Balance'
+                                      : 'Confirm Booking'),
+                            ),
+                          );
+                        },
                       ),
                     ],
                   ],
@@ -253,10 +340,53 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
           },
         ),
       ),
+        ),
     );
   }
 
-  void _submitBooking(BuildContext context, BookingState state) {
+  bool _isFormValid(BookingState state, BuildContext context) {
+    if (_selectedBusId == null) return false;
+    if (_selectedSeats.isEmpty) return false;
+    if (_passengerNameController.text.trim().isEmpty) return false;
+    if (_contactNumberController.text.trim().isEmpty) return false;
+    
+    // Check if selected bus has access
+    if (state.selectedBus != null) {
+      final bus = state.selectedBus!;
+      
+      // Check available seats
+      if (bus.availableSeats == 0) {
+        return false;
+      }
+      
+      // Check wallet balance first - if sufficient, allow booking even without access
+      final dashboardState = context.read<DashboardBloc>().state;
+      final dashboard = dashboardState.dashboard;
+      if (dashboard != null) {
+        final walletBalance = dashboard.counter.walletBalance;
+        final totalPrice = bus.price * _selectedSeats.length;
+        
+        // If user has sufficient wallet balance, allow booking (wallet grants access)
+        if (walletBalance >= totalPrice) {
+          return true; // Wallet balance sufficient - can book even without access
+        }
+        
+        // If insufficient balance AND no access, block booking
+        if ((bus.hasNoAccess == true || bus.hasAccess == false) && walletBalance < totalPrice) {
+          return false; // Both conditions: no access AND insufficient balance
+        }
+      } else {
+        // If dashboard not loaded, check access only
+        if (bus.hasNoAccess == true || bus.hasAccess == false) {
+          return false;
+        }
+      }
+    }
+    
+    return true;
+  }
+
+  Future<void> _submitBooking(BuildContext context, BookingState state) async {
     if (!_formKey.currentState!.validate()) {
       return;
     }
@@ -278,8 +408,14 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
     // Validate seat access before API call
     final selectedBus = state.selectedBus;
     if (selectedBus != null) {
-      // Check if counter has no access - redirect to wallet or request access
-      if (selectedBus.hasNoAccess == true || selectedBus.hasAccess == false) {
+      // Check wallet balance first - if sufficient, allow booking even without access
+      final dashboardState = context.read<DashboardBloc>().state;
+      final dashboard = dashboardState.dashboard;
+      final walletBalance = dashboard?.counter.walletBalance ?? 0.0;
+      final totalPrice = selectedBus.price * _selectedSeats.length;
+      
+      // If user has no access AND insufficient wallet balance, show dialog
+      if ((selectedBus.hasNoAccess == true || selectedBus.hasAccess == false) && walletBalance < totalPrice) {
         ScaffoldMessenger.of(context).showSnackBar(
           ErrorSnackBar(
             message: 'You do not have access to this bus. Please add money to wallet or request access.',
@@ -292,8 +428,10 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
               context: context,
               builder: (context) => AlertDialog(
                 title: const Text('No Access'),
-                content: const Text(
-                  'You do not have access to book seats on this bus. '
+                content: Text(
+                  'You do not have access to book seats on this bus.\n\n'
+                  'Required amount: Rs. ${NumberFormat('#,##0.00').format(totalPrice)}\n'
+                  'Current balance: Rs. ${NumberFormat('#,##0.00').format(walletBalance)}\n\n'
                   'Would you like to add money to your wallet or request access?',
                 ),
                 actions: [
@@ -322,6 +460,9 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
         });
         return;
       }
+      
+      // If user has sufficient wallet balance, proceed with booking (wallet grants access)
+      // The backend will handle the wallet deduction
 
       // Normalize selected seats for comparison (matches backend normalization)
       // Convert numeric strings to numbers, keep non-numeric as strings
@@ -510,28 +651,177 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
       }
     }
 
-    context.read<BookingBloc>().add(
-      CreateBookingEvent(
-        busId: _selectedBusId!,
-        seatNumbers: _selectedSeats,
-        passengerName: _passengerNameController.text.trim(),
-        contactNumber: _contactNumberController.text.trim(),
-        passengerEmail: _passengerEmailController.text.trim().isEmpty
-            ? null
-            : _passengerEmailController.text.trim(),
-        pickupLocation: _pickupLocationController.text.trim().isEmpty
-            ? null
-            : _pickupLocationController.text.trim(),
-        dropoffLocation: _dropoffLocationController.text.trim().isEmpty
-            ? null
-            : _dropoffLocationController.text.trim(),
-        luggage: _luggageController.text.trim().isEmpty
-            ? null
-            : _luggageController.text.trim(),
-        bagCount: _bagCount > 0 ? _bagCount : null,
-        paymentMethod: _selectedPaymentMethod,
-      ),
-    );
+    // Check wallet balance before proceeding with booking
+    final dashboardState = context.read<DashboardBloc>().state;
+    final dashboard = dashboardState.dashboard;
+    if (dashboard != null) {
+      final walletBalance = dashboard.counter.walletBalance;
+      final totalPrice = selectedBus != null 
+          ? selectedBus.price * _selectedSeats.length 
+          : 0.0;
+      
+      if (walletBalance < totalPrice) {
+        final shortage = totalPrice - walletBalance;
+        ScaffoldMessenger.of(context).showSnackBar(
+          ErrorSnackBar(
+            message: 'Insufficient wallet balance. You need Rs. ${NumberFormat('#,##0.00').format(totalPrice)} to book ${_selectedSeats.length} seat(s). Current balance: Rs. ${NumberFormat('#,##0.00').format(walletBalance)}. Please add Rs. ${NumberFormat('#,##0.00').format(shortage)} to your wallet.',
+          ),
+        );
+        Future.delayed(const Duration(milliseconds: 500), () {
+          if (mounted) {
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('Insufficient Wallet Balance'),
+                content: Text(
+                  'You need Rs. ${NumberFormat('#,##0.00').format(totalPrice)} to book ${_selectedSeats.length} seat(s).\n\n'
+                  'Current balance: Rs. ${NumberFormat('#,##0.00').format(walletBalance)}\n\n'
+                  'Please add Rs. ${NumberFormat('#,##0.00').format(shortage)} to your wallet to proceed.',
+                ),
+                actions: [
+                  TextButton(
+                    onPressed: () => context.pop(),
+                    child: const Text('Cancel'),
+                  ),
+                  ElevatedButton(
+                    onPressed: () {
+                      context.pop();
+                      context.go('/wallet');
+                    },
+                    child: const Text('Add Money to Wallet'),
+                  ),
+                ],
+              ),
+            );
+          }
+        });
+        return;
+      }
+    }
+
+    // Two-Step Hold Flow: Create hold first, then create booking
+    await _createBookingWithHold(context, state, selectedBus);
+  }
+
+  Future<void> _createBookingWithHold(
+    BuildContext context,
+    BookingState state,
+    BusInfoEntity? selectedBus,
+  ) async {
+    if (selectedBus == null) return;
+
+    final totalPrice = selectedBus.price * _selectedSeats.length;
+    final busName = selectedBus.name;
+    final seatsStr = _selectedSeats.map((s) => s.toString()).join(', ');
+
+    // Step 1: Create wallet hold
+    try {
+      final createHold = di.sl<CreateWalletHold>();
+      final holdResult = await createHold(
+        amount: totalPrice,
+        description: 'Hold for booking - Bus: $busName, Seats: $seatsStr',
+      );
+
+      if (holdResult is Error) {
+        final failure = (holdResult as Error).failure;
+        
+        // Handle insufficient balance error
+        if (failure is ServerFailure && 
+            failure.message.toLowerCase().contains('insufficient')) {
+          final dashboardState = context.read<DashboardBloc>().state;
+          final dashboard = dashboardState.dashboard;
+          final walletBalance = dashboard?.counter.walletBalance ?? 0.0;
+          final shortage = totalPrice - walletBalance;
+          
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              ErrorSnackBar(
+                message: 'Insufficient wallet balance. You need Rs. ${NumberFormat('#,##0.00').format(totalPrice)}. Current balance: Rs. ${NumberFormat('#,##0.00').format(walletBalance)}.',
+              ),
+            );
+            Future.delayed(const Duration(milliseconds: 500), () {
+              if (mounted) {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Insufficient Wallet Balance'),
+                    content: Text(
+                      'You need Rs. ${NumberFormat('#,##0.00').format(totalPrice)} to book ${_selectedSeats.length} seat(s).\n\n'
+                      'Current balance: Rs. ${NumberFormat('#,##0.00').format(walletBalance)}\n\n'
+                      'Please add Rs. ${NumberFormat('#,##0.00').format(shortage)} to your wallet to proceed.',
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () => context.pop(),
+                        child: const Text('Cancel'),
+                      ),
+                      ElevatedButton(
+                        onPressed: () {
+                          context.pop();
+                          context.go('/wallet');
+                        },
+                        child: const Text('Add Money to Wallet'),
+                      ),
+                    ],
+                  ),
+                );
+              }
+            });
+          }
+          return;
+        }
+        
+        // Handle other errors (do not expose backend/API details)
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            ErrorSnackBar(
+              message: 'Unable to reserve the amount. Please try again or add money to your wallet.',
+            ),
+          );
+        }
+        return;
+      }
+
+      // Step 2: Hold created successfully, create booking with holdId
+      final hold = (holdResult as Success).data;
+      final holdId = hold.holdId;
+
+      if (mounted) {
+        // Create booking with holdId
+        context.read<BookingBloc>().add(
+          CreateBookingEvent(
+            busId: _selectedBusId!,
+            seatNumbers: _selectedSeats,
+            passengerName: _passengerNameController.text.trim(),
+            contactNumber: _contactNumberController.text.trim(),
+            passengerEmail: _passengerEmailController.text.trim().isEmpty
+                ? null
+                : _passengerEmailController.text.trim(),
+            pickupLocation: _pickupLocationController.text.trim().isEmpty
+                ? null
+                : _pickupLocationController.text.trim(),
+            dropoffLocation: _dropoffLocationController.text.trim().isEmpty
+                ? null
+                : _dropoffLocationController.text.trim(),
+            luggage: _luggageController.text.trim().isEmpty
+                ? null
+                : _luggageController.text.trim(),
+            bagCount: _bagCount > 0 ? _bagCount : null,
+            paymentMethod: _selectedPaymentMethod,
+            holdId: holdId, // Pass holdId to booking
+          ),
+        );
+      }
+    } catch (e) {
+      // Handle unexpected errors
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          ErrorSnackBar(
+            message: 'An error occurred while reserving amount. Please try again.',
+          ),
+        );
+      }
+    }
   }
 }
 
@@ -568,29 +858,89 @@ class _BusSelectionSection extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             if (buses.isEmpty)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.all(32),
-                  child: Column(
-                    children: [
-                      Icon(Icons.event_busy, size: 64, color: Colors.grey[400]),
-                      const SizedBox(height: 16),
-                      Text(
-                        'No buses available',
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                              color: Colors.grey[600],
-                            ),
-                      ),
-                    ],
-                  ),
-                ),
+              const EmptyStateWidget(
+                icon: Icons.event_busy,
+                title: 'No buses available',
+                description: 'Please check back later or contact support.',
               )
-            else
-              ...buses.map((bus) => _BusCard(
-                    bus: bus,
-                    isSelected: selectedBusId == bus.id,
-                    onTap: () => onBusSelected(bus.id),
-                  )),
+            else ...[
+              // Show all buses - check wallet balance to determine if accessible
+              BlocBuilder<DashboardBloc, DashboardState>(
+                builder: (context, dashboardState) {
+                  final dashboard = dashboardState.dashboard;
+                  final walletBalance = dashboard?.counter.walletBalance ?? 0.0;
+                  
+                  // Separate buses into accessible and inaccessible
+                  final accessibleBuses = buses.where((bus) {
+                    if (bus.availableSeats == 0) return false;
+                    if (selectedBusId == bus.id) return true;
+                    final hasAccess = bus.hasAccess == true;
+                    final hasNoAccess = bus.hasAccess == false || 
+                                       (bus.hasAccess == null && bus.hasNoAccess == true);
+                    final estimatedPrice = bus.price; // Estimate for one seat
+                    final hasSufficientBalance = walletBalance >= estimatedPrice;
+                    
+                    // Bus is accessible if: has access OR has sufficient wallet balance
+                    return hasAccess || (hasNoAccess && hasSufficientBalance);
+                  }).toList();
+                  
+                  final inaccessibleBuses = buses.where((bus) {
+                    if (bus.availableSeats == 0) return true;
+                    if (selectedBusId == bus.id) return false;
+                    final hasAccess = bus.hasAccess == true;
+                    final hasNoAccess = bus.hasAccess == false || 
+                                       (bus.hasAccess == null && bus.hasNoAccess == true);
+                    final estimatedPrice = bus.price;
+                    final hasSufficientBalance = walletBalance >= estimatedPrice;
+                    
+                    // Bus is inaccessible if: no access AND insufficient balance
+                    return hasNoAccess && !hasSufficientBalance;
+                  }).toList();
+                  
+                  return Column(
+                    children: [
+                      // Show accessible buses first
+                      ...accessibleBuses.map((bus) {
+                        final hasNoAccess = bus.hasAccess == false || 
+                                           (bus.hasAccess == null && bus.hasNoAccess == true);
+                        final estimatedPrice = bus.price;
+                        final hasSufficientBalance = walletBalance >= estimatedPrice;
+                        final isSelected = selectedBusId == bus.id;
+                        
+                        // Disable if: 
+                        // - no seats available
+                        // - OR (no access AND insufficient balance AND another bus is selected)
+                        // This allows users with wallet balance to switch to buses with no access
+                        final isDisabled = bus.availableSeats == 0 || 
+                                          (hasNoAccess && !hasSufficientBalance && selectedBusId != null && !isSelected);
+                        
+                        return _BusCard(
+                          bus: bus,
+                          isSelected: isSelected,
+                          isDisabled: isDisabled,
+                          onTap: isDisabled ? null : () => onBusSelected(bus.id),
+                        );
+                      }),
+                      // Show inaccessible buses (no access AND insufficient balance) as disabled at the bottom
+                      if (inaccessibleBuses.isNotEmpty)
+                        ...inaccessibleBuses.map((bus) {
+                          final isSelected = selectedBusId == bus.id;
+                          // These buses already have no access AND insufficient balance
+                          // Disable them if another bus is selected (but keep selected bus enabled)
+                          final isDisabled = selectedBusId != null && !isSelected;
+                          
+                          return _BusCard(
+                            bus: bus,
+                            isSelected: isSelected,
+                            isDisabled: isDisabled,
+                            onTap: isDisabled ? null : () => onBusSelected(bus.id),
+                          );
+                        }),
+                    ],
+                  );
+                },
+              ),
+            ],
           ],
         ),
       ),
@@ -601,145 +951,258 @@ class _BusSelectionSection extends StatelessWidget {
 class _BusCard extends StatelessWidget {
   final BusInfoEntity bus;
   final bool isSelected;
-  final VoidCallback onTap;
+  final bool isDisabled;
+  final VoidCallback? onTap;
 
   const _BusCard({
     required this.bus,
     required this.isSelected,
-    required this.onTap,
+    this.isDisabled = false,
+    this.onTap,
   });
+
+  String _formatTime(String time) {
+    try {
+      // Try parsing as HH:mm format
+      final parsed = DateFormat('HH:mm').parse(time);
+      return DateFormat('h:mm a').format(parsed);
+    } catch (e) {
+      // If parsing fails, return original time
+      return time;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final hasNoAccess = bus.hasNoAccess == true || bus.hasAccess == false;
+    final noSeats = bus.availableSeats == 0;
+    final opacity = isDisabled ? 0.5 : 1.0;
 
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      color: isSelected
-          ? Theme.of(context).colorScheme.primaryContainer
-          : null,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? Theme.of(context).colorScheme.primary
-                      : Theme.of(context).colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+    return Opacity(
+      opacity: opacity,
+      child: Card(
+        margin: const EdgeInsets.only(bottom: 12),
+        color: isSelected
+            ? Theme.of(context).colorScheme.primaryContainer
+            : (isDisabled ? AppTheme.surfaceColor : null),
+        child: InkWell(
+          onTap: isDisabled ? null : onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isSelected
+                        ? Theme.of(context).colorScheme.primary
+                        : (isDisabled 
+                            ? AppTheme.textTertiary.withOpacity(0.2)
+                            : Theme.of(context).colorScheme.primaryContainer),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(
+                    Icons.directions_bus,
+                    color: isSelected
+                        ? Colors.white
+                        : (isDisabled 
+                            ? AppTheme.textTertiary
+                            : Theme.of(context).colorScheme.primary),
+                  ),
                 ),
-                child: Icon(
-                  Icons.directions_bus,
-                  color: isSelected
-                      ? Colors.white
-                      : Theme.of(context).colorScheme.primary,
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              bus.name.isEmpty ? 'Bus ${bus.id.substring(0, 8)}' : bus.name,
+                              style: theme.textTheme.titleMedium?.copyWith(
+                                    fontWeight: FontWeight.bold,
+                                    color: isSelected
+                                        ? Colors.white
+                                        : (isDisabled 
+                                            ? AppTheme.textTertiary
+                                            : theme.textTheme.titleMedium?.color),
+                                  ),
+                            ),
+                          ),
+                          if (hasNoAccess)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.errorColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'No Access',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.errorColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            )
+                          else if (noSeats)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: AppTheme.warningColor.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                'Full',
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.warningColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.route,
+                            size: 14,
+                            color: isSelected 
+                                ? Colors.white70 
+                                : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                          ),
+                          const SizedBox(width: 4),
+                          Expanded(
+                            child: Text(
+                              '${bus.from} → ${bus.to}',
+                              style: theme.textTheme.bodyMedium?.copyWith(
+                                color: isSelected
+                                    ? Colors.white70
+                                    : (isDisabled ? AppTheme.textTertiary : theme.textTheme.bodyMedium?.color),
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Wrap(
+                        spacing: 8,
+                        runSpacing: 4,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.access_time,
+                                size: 14,
+                                color: isSelected 
+                                    ? Colors.white70 
+                                    : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatTime(bus.time),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                      color: isSelected 
+                                          ? Colors.white70 
+                                          : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                                    ),
+                              ),
+                              if (bus.arrival != null) ...[
+                                const SizedBox(width: 4),
+                                Text(
+                                  '→ ${_formatTime(bus.arrival!)}',
+                                  style: theme.textTheme.bodySmall?.copyWith(
+                                        color: isSelected 
+                                            ? Colors.white70 
+                                            : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                                      ),
+                                ),
+                              ],
+                            ],
+                          ),
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                Icons.event,
+                                size: 14,
+                                color: isSelected 
+                                    ? Colors.white70 
+                                    : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                DateFormat('MMM d').format(bus.date),
+                                style: theme.textTheme.bodySmall?.copyWith(
+                                      color: isSelected 
+                                          ? Colors.white70 
+                                          : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                                    ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
-                      bus.name,
+                      'Rs. ${NumberFormat('#,##0').format(bus.price)}',
                       style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: isSelected
                                 ? Colors.white
-                                : theme.textTheme.titleMedium?.color,
+                                : (isDisabled ? AppTheme.textTertiary : theme.colorScheme.primary),
                           ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      '${bus.from} → ${bus.to}',
-                      style: theme.textTheme.bodyMedium?.copyWith(
-                        color: isSelected
-                            ? Colors.white70
-                            : theme.textTheme.bodyMedium?.color,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: bus.availableSeats > 0 
+                            ? AppTheme.successColor.withOpacity(0.1) 
+                            : AppTheme.errorColor.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Icon(
-                          Icons.access_time,
-                          size: 16,
-                          color: isSelected ? Colors.white70 : Colors.grey[600],
+                      child: Text(
+                        '${bus.availableSeats} ${bus.availableSeats == 1 ? 'seat' : 'seats'}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: bus.availableSeats > 0 
+                              ? AppTheme.successColor 
+                              : AppTheme.errorColor,
+                          fontWeight: FontWeight.w500,
                         ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            '${bus.time}${bus.arrival != null ? ' - ${bus.arrival}' : ''}',
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                  color: isSelected ? Colors.white70 : Colors.grey[600],
-                                ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Icon(
-                          Icons.event,
-                          size: 16,
-                          color: isSelected ? Colors.white70 : Colors.grey[600],
-                        ),
-                        const SizedBox(width: 4),
-                        Flexible(
-                          child: Text(
-                            DateFormat('MMM d, y').format(bus.date),
-                            style: theme.textTheme.bodySmall?.copyWith(
-                                  color: isSelected ? Colors.white70 : Colors.grey[600],
-                                ),
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ],
                 ),
-              ),
-              Column(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  Text(
-                    'Rs. ${NumberFormat('#,##0').format(bus.price)}',
-                    style: theme.textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.bold,
-                          color: isSelected
-                              ? Colors.white
-                              : theme.colorScheme.primary,
-                        ),
+                if (isSelected) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.check_circle,
+                    color: Theme.of(context).colorScheme.primary,
                   ),
-                  const SizedBox(height: 4),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: bus.availableSeats > 0 ? Colors.green[100] : Colors.red[100],
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    child: Text(
-                      '${bus.availableSeats} seats',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: bus.availableSeats > 0 ? Colors.green[700] : Colors.red[700],
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
+                ] else if (isDisabled) ...[
+                  const SizedBox(width: 8),
+                  Icon(
+                    Icons.block,
+                    color: AppTheme.textTertiary,
+                    size: 20,
                   ),
                 ],
-              ),
-              if (isSelected) ...[
-                const SizedBox(width: 8),
-                Icon(
-                  Icons.check_circle,
-                  color: Theme.of(context).colorScheme.primary,
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -832,16 +1295,16 @@ class _SeatSelectionSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: AppTheme.warningColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
+                border: Border.all(color: AppTheme.warningColor.withOpacity(0.5)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                      Icon(Icons.info_outline, color: AppTheme.warningColor, size: 20),
                       const SizedBox(width: AppTheme.spacingS),
                       Expanded(
                         child: Text(
@@ -849,7 +1312,7 @@ class _SeatSelectionSection extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
-                            color: Colors.orange.shade700,
+                            color: AppTheme.warningColor,
                           ),
                         ),
                       ),
@@ -861,7 +1324,7 @@ class _SeatSelectionSection extends StatelessWidget {
                       'You can only book seats: ${bus.allowedSeats!.map((s) => s.toString()).join(', ')}',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.orange.shade700,
+                        color: AppTheme.warningColor,
                       ),
                     ),
                   if (bus.availableAllowedSeats != null && bus.availableAllowedSeats!.isNotEmpty)
@@ -870,7 +1333,7 @@ class _SeatSelectionSection extends StatelessWidget {
                       style: TextStyle(
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
-                        color: Colors.orange.shade700,
+                        color: AppTheme.warningColor,
                       ),
                     ),
                 ],
@@ -881,20 +1344,20 @@ class _SeatSelectionSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: AppTheme.errorColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: AppTheme.errorColor.withOpacity(0.5)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.block, color: Colors.red.shade700, size: 20),
+                  Icon(Icons.block, color: AppTheme.errorColor, size: 20),
                   const SizedBox(width: AppTheme.spacingS),
                   Expanded(
                     child: Text(
                       'No Access: You do not have permission to book seats on this bus.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.red.shade700,
+                        color: AppTheme.errorColor,
                       ),
                     ),
                   ),
@@ -906,20 +1369,20 @@ class _SeatSelectionSection extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: AppTheme.successColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+                border: Border.all(color: AppTheme.successColor.withOpacity(0.5)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                  Icon(Icons.check_circle, color: AppTheme.successColor, size: 20),
                   const SizedBox(width: AppTheme.spacingS),
                   Expanded(
                     child: Text(
                       'Full Access: You can book any available seat.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.green.shade700,
+                        color: AppTheme.successColor,
                       ),
                     ),
                   ),
@@ -952,20 +1415,90 @@ class _SeatSelectionSection extends StatelessWidget {
             },
           ),
           const SizedBox(height: 16),
+          // Legend (Available, Sold, Selected) - like reference image
+          if (bus.seatConfiguration != null && bus.seatConfiguration!.isNotEmpty) ...[
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingS, horizontal: AppTheme.spacingM),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceColor,
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.lightBorderColor),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _LegendChip(
+                    color: AppTheme.successColor,
+                    label: 'Available',
+                    icon: Icons.airline_seat_recline_normal_rounded,
+                  ),
+                  _LegendChip(
+                    color: AppTheme.errorColor,
+                    label: 'Sold',
+                    icon: Icons.event_busy,
+                  ),
+                  _LegendChip(
+                    color: Theme.of(context).colorScheme.primary,
+                    label: 'Selected',
+                    icon: Icons.check_circle,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingM),
+            // Bus info footer (name, route, time, date)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(AppTheme.spacingM),
+              decoration: BoxDecoration(
+                color: AppTheme.primaryColor.withOpacity(0.06),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: AppTheme.lightBorderColor),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    bus.name,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${bus.from} to ${bus.to}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '${bus.time}${bus.arrival != null ? ' | ${bus.arrival}' : ''}, ${DateFormat('EEEE, d MMMM yyyy').format(bus.date)}',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textSecondary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: AppTheme.spacingM),
+          ],
           // Seat Status Summary
           Container(
             padding: const EdgeInsets.all(AppTheme.spacingS),
             decoration: BoxDecoration(
-              color: Colors.blue.shade50,
+              color: AppTheme.statusInfo.withOpacity(0.1),
               borderRadius: BorderRadius.circular(8),
-              border: Border.all(color: Colors.blue.shade200),
+              border: Border.all(color: AppTheme.statusInfo.withOpacity(0.5)),
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _SeatStatusItem(
                   icon: Icons.event_seat,
-                  color: Colors.green,
+                  color: AppTheme.successColor,
                   label: bus.hasRestrictedAccess == true 
                       ? 'Available Allowed' 
                       : 'Available',
@@ -975,20 +1508,20 @@ class _SeatSelectionSection extends StatelessWidget {
                 ),
                 _SeatStatusItem(
                   icon: Icons.event_busy,
-                  color: Colors.red,
-                  label: 'Booked',
+                  color: AppTheme.errorColor,
+                  label: 'Sold',
                   count: bookedSeats.length,
                 ),
                 _SeatStatusItem(
                   icon: Icons.lock,
-                  color: Colors.orange,
+                  color: AppTheme.warningColor,
                   label: 'Locked',
                   count: lockedSeats.length,
                 ),
                 if (bus.hasRestrictedAccess == true && bus.allowedSeatsCount != null)
                   _SeatStatusItem(
                     icon: Icons.check_circle,
-                    color: Colors.blue,
+                    color: AppTheme.statusInfo,
                     label: 'Allowed',
                     count: bus.allowedSeatsCount!,
                   ),
@@ -1038,6 +1571,71 @@ class _SeatSelectionSection extends StatelessWidget {
   }
 }
 
+/// Builds a column of seat widgets for Lower Decker A or B side.
+/// Arranges seats in pairs (2 seats per row) matching reference image.
+List<Widget> _buildDeckerSeatColumn(
+  List<dynamic> seatIds,
+  List<dynamic> bookedSeats,
+  List<dynamic> lockedSeats,
+  List<dynamic> selectedSeats,
+  BusInfoEntity bus,
+  double Function(dynamic) getSeatPrice, // Function to get price per seat
+  bool Function(dynamic, List<dynamic>) isSeatInList,
+  void Function(dynamic) onSeatTapped,
+) {
+  final widgets = <Widget>[];
+  
+  // Arrange seats in pairs (2 seats per row)
+  for (int i = 0; i < seatIds.length; i += 2) {
+    final rowSeats = seatIds.skip(i).take(2).toList();
+    
+    widgets.add(
+      Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+        children: rowSeats.map<Widget>((seatId) {
+          final isBooked = isSeatInList(seatId, bookedSeats);
+          final isLocked = isSeatInList(seatId, lockedSeats);
+          final isSelected = isSeatInList(seatId, selectedSeats);
+          final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked);
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
+              child: _SeatWidget(
+                seatIdentifier: seatId,
+                seatPrice: getSeatPrice(seatId),
+                isBooked: isBooked,
+                isLocked: isLocked,
+                isSelected: isSelected,
+                isNotAllowed: !isSelectable,
+                onTap: (isBooked || isLocked || !isSelectable) ? null : () => onSeatTapped(seatId),
+              ),
+            ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+  
+  return widgets;
+}
+
+bool _seatSelectable(BusInfoEntity bus, dynamic seatId, bool isBooked, bool isLocked) {
+  if (isBooked || isLocked) return false;
+  if (bus.hasNoAccess == true) return false;
+  if (bus.hasRestrictedAccess == true && bus.availableAllowedSeats != null && bus.availableAllowedSeats!.isNotEmpty) {
+    final seatNum = seatId is int ? seatId : (seatId is String && int.tryParse(seatId) != null ? int.parse(seatId) : null);
+    if (seatNum != null) return bus.availableAllowedSeats!.contains(seatNum);
+    return bus.availableAllowedSeats!.any((a) => a.toString() == seatId.toString());
+  }
+  if (bus.hasAccess == true && bus.requiresWallet != true) return true;
+  if (bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty) {
+    final seatNum = seatId is int ? seatId : (seatId is String && int.tryParse(seatId) != null ? int.parse(seatId) : null);
+    if (seatNum != null) return bus.allowedSeats!.contains(seatNum);
+    return bus.allowedSeats!.any((a) => a.toString() == seatId.toString());
+  }
+  return true;
+}
+
 class _SeatMap extends StatelessWidget {
   final BusInfoEntity bus; // Bus entity to check allowedSeats
   final int totalSeats;
@@ -1055,6 +1653,151 @@ class _SeatMap extends StatelessWidget {
     required this.selectedSeats,
     required this.onSeatTapped,
   });
+  
+  // Build Lower Decker layout matching reference image exactly
+  Widget _buildLowerDeckerLayout(
+    BuildContext context,
+    List<dynamic> seatIdentifiers,
+    List<dynamic> bookedSeats,
+    List<dynamic> lockedSeats,
+    List<dynamic> selectedSeats,
+    BusInfoEntity bus,
+    double Function(dynamic) getSeatPrice,
+    bool Function(dynamic, List<dynamic>) isSeatInList,
+    void Function(dynamic) onSeatTapped,
+  ) {
+    // Separate special seats (cabin) from standard A/B seats
+    final cabinSeats = <dynamic>[];
+    final standardASeats = <dynamic>[];
+    final standardBSeats = <dynamic>[];
+    final tailSeats = <dynamic>[];
+    
+    for (final id in seatIdentifiers) {
+      final s = id.toString().trim().toUpperCase();
+      if (s == 'SP1' || s == 'J1' || s == 'J2' || 
+          s == 'AKC' || s == 'AKHA' || s == 'AGG' || s == 'AGHA' ||
+          s == 'BKC' || s == 'KHA' || s == 'BGC' || s == 'BGHA') {
+        cabinSeats.add(id);
+      } else if (s.startsWith('A') && RegExp(r'^A\d+$').hasMatch(s)) {
+        standardASeats.add(id);
+      } else if (s.startsWith('B') && RegExp(r'^B\d+$').hasMatch(s)) {
+        standardBSeats.add(id);
+      } else if (s == '15') {
+        tailSeats.add(id);
+      } else {
+        // Other non-standard seats go to cabin
+        cabinSeats.add(id);
+      }
+    }
+    
+    // Sort A and B seats numerically
+    int sortKey(dynamic id) {
+      final s = id.toString();
+      final match = RegExp(r'\d+').firstMatch(s);
+      return match != null ? int.tryParse(match.group(0) ?? '0') ?? 0 : 0;
+    }
+    standardASeats.sort((a, b) => sortKey(a).compareTo(sortKey(b)));
+    standardBSeats.sort((a, b) => sortKey(a).compareTo(sortKey(b)));
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Section title: Lower Decker
+        Padding(
+          padding: const EdgeInsets.only(top: AppTheme.spacingS, bottom: AppTheme.spacingM),
+          child: Text(
+            'Lower Decker',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+        ),
+        // Build cabin row (special seats at top)
+        if (cabinSeats.isNotEmpty) ...[
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.center,
+            children: cabinSeats.map<Widget>((seatId) {
+              final isBooked = isSeatInList(seatId, bookedSeats);
+              final isLocked = isSeatInList(seatId, lockedSeats);
+              final isSelected = isSeatInList(seatId, selectedSeats);
+              final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked);
+              return _SeatWidget(
+                seatIdentifier: seatId,
+                seatPrice: getSeatPrice(seatId),
+                isBooked: isBooked,
+                isLocked: isLocked,
+                isSelected: isSelected,
+                isNotAllowed: !isSelectable,
+                onTap: (isBooked || isLocked || !isSelectable) ? null : () => onSeatTapped(seatId),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+        ],
+        // A (left) and B (right) columns with aisle - arranged in pairs
+        Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: _buildDeckerSeatColumn(
+                  standardASeats,
+                  bookedSeats,
+                  lockedSeats,
+                  selectedSeats,
+                  bus,
+                  getSeatPrice,
+                  isSeatInList,
+                  onSeatTapped,
+                ),
+              ),
+            ),
+            const SizedBox(width: 12), // Aisle
+            Expanded(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: _buildDeckerSeatColumn(
+                  standardBSeats,
+                  bookedSeats,
+                  lockedSeats,
+                  selectedSeats,
+                  bus,
+                  getSeatPrice,
+                  isSeatInList,
+                  onSeatTapped,
+                ),
+              ),
+            ),
+          ],
+        ),
+        // Tail seat "15" - single middle seat
+        if (tailSeats.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Center(
+            child: tailSeats.map<Widget>((seatId) {
+              final isBooked = isSeatInList(seatId, bookedSeats);
+              final isLocked = isSeatInList(seatId, lockedSeats);
+              final isSelected = isSeatInList(seatId, selectedSeats);
+              final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked);
+              return _SeatWidget(
+                seatIdentifier: seatId,
+                seatPrice: getSeatPrice(seatId),
+                isBooked: isBooked,
+                isLocked: isLocked,
+                isSelected: isSelected,
+                isNotAllowed: !isSelectable,
+                onTap: (isBooked || isLocked || !isSelectable) ? null : () => onSeatTapped(seatId),
+              );
+            }).toList().first,
+          ),
+        ],
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1123,9 +1866,12 @@ class _SeatMap extends StatelessWidget {
       }
     }
     
-    // Calculate seats per row (typically 2-2 pattern or 2-1 pattern)
+    // When using seatConfiguration (e.g. ["A1","A2","B1","B2"]), use Lower Decker layout
+    final useLowerDeckerLayout = seatConfiguration != null && seatConfiguration!.isNotEmpty;
+    
+    // Fallback: seats per row for non-config layout
     final seatsPerRow = 4; // 2 seats on each side
-    final rows = (seatIdentifiers.length / seatsPerRow).ceil();
+    final rows = useLowerDeckerLayout ? 0 : (seatIdentifiers.length / seatsPerRow).ceil();
     
     // Helper to normalize seat IDs for comparison (handles int, String, num)
     // Converts everything to a consistent string format for comparison
@@ -1173,55 +1919,70 @@ class _SeatMap extends StatelessWidget {
       });
     }
 
+    // Helper function to get price for a specific seat
+    // A13, A14, B13, B14, and seat "15" get रु.1600, others get रु.1800 (or bus base price)
+    double getSeatPrice(dynamic seatId) {
+      final seatStr = seatId.toString().toUpperCase();
+      // Check for lower-priced seats (rear seats)
+      if (seatStr == 'A13' || seatStr == 'A14' || 
+          seatStr == 'B13' || seatStr == 'B14' || 
+          seatStr == '15') {
+        return 1600.0;
+      }
+      // Default price (or use bus base price if different)
+      return bus.price > 0 ? bus.price : 1800.0;
+    }
+
     return Container(
       padding: const EdgeInsets.all(AppTheme.spacingM),
       decoration: BoxDecoration(
         color: AppTheme.surfaceColor,
         borderRadius: BorderRadius.circular(AppTheme.radiusM),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: AppTheme.lightBorderColor),
       ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Driver/Steering wheel indicator
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingS),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.airline_seat_recline_normal_rounded,
-                  size: 20,
-                  color: AppTheme.textTertiary,
-                ),
-                const SizedBox(width: AppTheme.spacingS),
-                Text(
-                  'Front',
-                  style: TextStyle(
-                    color: AppTheme.textTertiary,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
+          // Front of bus: steering wheel icon (right-aligned like reference image)
+          Row(
+            mainAxisAlignment: MainAxisAlignment.end,
+            children: [
+              Icon(
+                Icons.drive_eta_rounded, // Steering wheel icon
+                size: 24,
+                color: Colors.grey.shade600,
+              ),
+            ],
           ),
-          const SizedBox(height: AppTheme.spacingS),
-          // Seat grid
-          if (seatIdentifiers.isEmpty) ...[
+          if (useLowerDeckerLayout) 
+            _buildLowerDeckerLayout(
+              context,
+              seatIdentifiers,
+              bookedSeats,
+              lockedSeats,
+              selectedSeats,
+              bus,
+              getSeatPrice,
+              isSeatInList,
+              onSeatTapped,
+            ),
+          // Original grid layout when not using seatConfiguration
+          if (!useLowerDeckerLayout && seatIdentifiers.isEmpty) ...[
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingL),
               decoration: BoxDecoration(
-                color: Colors.grey.shade100,
+                color: AppTheme.surfaceColor,
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Center(
                 child: Column(
                   children: [
-                    Icon(Icons.event_busy, size: 48, color: Colors.grey[400]),
+                    Icon(Icons.event_busy, size: 48, color: AppTheme.textTertiary),
                     const SizedBox(height: AppTheme.spacingS),
                     Text(
                       'No seats available for booking.',
                       style: TextStyle(
-                        color: Colors.grey[600],
+                        color: AppTheme.textSecondary,
                         fontSize: 14,
                       ),
                     ),
@@ -1231,7 +1992,7 @@ class _SeatMap extends StatelessWidget {
                         child: Text(
                           'You do not have access to book seats on this bus.',
                           style: TextStyle(
-                            color: Colors.grey[500],
+                            color: AppTheme.textSecondary,
                             fontSize: 12,
                           ),
                         ),
@@ -1332,30 +2093,30 @@ class _SeatMap extends StatelessWidget {
             );
           }),
           ],
-          // Back indicator
-          if (seatIdentifiers.isNotEmpty) ...[
-          const SizedBox(height: AppTheme.spacingS),
-          Container(
-            padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingS),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(
-                  Icons.airline_seat_recline_normal_rounded,
-                  size: 20,
-                  color: AppTheme.textTertiary,
-                ),
-                const SizedBox(width: AppTheme.spacingS),
-                Text(
-                  'Back',
-                  style: TextStyle(
+          // Back indicator (only for grid layout, not Lower Decker)
+          if (!useLowerDeckerLayout && seatIdentifiers.isNotEmpty) ...[
+            const SizedBox(height: AppTheme.spacingS),
+            Container(
+              padding: const EdgeInsets.symmetric(vertical: AppTheme.spacingS),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.airline_seat_recline_normal_rounded,
+                    size: 20,
                     color: AppTheme.textTertiary,
-                    fontSize: 12,
                   ),
-                ),
-              ],
+                  const SizedBox(width: AppTheme.spacingS),
+                  Text(
+                    'Back',
+                    style: TextStyle(
+                      color: AppTheme.textTertiary,
+                      fontSize: 12,
+                    ),
+                  ),
+                ],
+              ),
             ),
-          ),
           ],
         ],
       ),
@@ -1365,6 +2126,7 @@ class _SeatMap extends StatelessWidget {
 
 class _SeatWidget extends StatelessWidget {
   final dynamic seatIdentifier; // Supports both int and String
+  final double? seatPrice; // When set, show Lower Decker style (icon + label + price)
   final bool isBooked;
   final bool isLocked;
   final bool isSelected;
@@ -1373,6 +2135,7 @@ class _SeatWidget extends StatelessWidget {
 
   const _SeatWidget({
     required this.seatIdentifier,
+    this.seatPrice,
     required this.isBooked,
     required this.isLocked,
     required this.isSelected,
@@ -1382,38 +2145,119 @@ class _SeatWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    Color backgroundColor;
+    final showDeckerStyle = seatPrice != null;
+    
+    // Determine colors based on state - matching reference image exactly
+    Color outlineColor;
     Color textColor;
-    IconData? icon;
+    Color? backgroundColor;
     String statusText = '';
-
-    // Determine seat status and styling
+    
     if (isBooked) {
-      backgroundColor = Colors.red[400]!;
-      textColor = Colors.white;
-      icon = Icons.event_busy;
-      statusText = 'Booked';
+      // Sold seats: red/pinkish outline (like reference image)
+      outlineColor = const Color(0xFFEF4444); // Red
+      textColor = const Color(0xFF1A1A1A); // Black text
+      backgroundColor = null; // No fill, just outline
+      statusText = 'Sold';
     } else if (isNotAllowed) {
-      backgroundColor = Colors.grey[400]!;
-      textColor = Colors.grey[800]!;
-      icon = Icons.block;
+      outlineColor = AppTheme.textTertiary;
+      textColor = AppTheme.textTertiary;
+      backgroundColor = null;
       statusText = 'Blocked';
     } else if (isLocked) {
-      backgroundColor = Colors.orange[400]!;
-      textColor = Colors.white;
-      icon = Icons.lock;
+      outlineColor = AppTheme.warningColor;
+      textColor = const Color(0xFF1A1A1A);
+      backgroundColor = null;
       statusText = 'Locked';
     } else if (isSelected) {
-      backgroundColor = Theme.of(context).colorScheme.primary;
-      textColor = Colors.white;
-      icon = Icons.check_circle;
+      outlineColor = Theme.of(context).colorScheme.primary;
+      textColor = const Color(0xFF1A1A1A);
+      backgroundColor = Theme.of(context).colorScheme.primary.withOpacity(0.1);
       statusText = 'Selected';
     } else {
-      backgroundColor = Colors.green[50]!;
-      textColor = Colors.green[900]!;
+      // Available seats: green outline (like reference image)
+      outlineColor = const Color(0xFF10B981); // Green
+      textColor = const Color(0xFF1A1A1A); // Black text
+      backgroundColor = null; // No fill, just outline
       statusText = 'Available';
     }
 
+    if (showDeckerStyle) {
+      // Lower Decker style: green outline sofa icon, label, price (EXACTLY like reference image)
+      return Tooltip(
+        message: '$statusText - ${seatIdentifier.toString()}',
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+            decoration: BoxDecoration(
+              color: backgroundColor ?? Colors.transparent,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: outlineColor,
+                width: 2.5, // Thick outline like reference
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                // Sofa/chair icon - rounded outline shape
+                Container(
+                  width: 32,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(
+                      color: outlineColor,
+                      width: 2,
+                    ),
+                  ),
+                  child: Icon(
+                    Icons.airline_seat_recline_normal_rounded,
+                    size: 18,
+                    color: outlineColor,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                // Seat label - bold black text
+                Text(
+                  seatIdentifier.toString(),
+                  style: const TextStyle(
+                    color: Color(0xFF1A1A1A), // Black text
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
+                ),
+                // Price below - smaller font
+                if (seatPrice != null)
+                  Text(
+                    'रु.${NumberFormat('#,##0').format(seatPrice!.toInt())}',
+                    style: TextStyle(
+                      color: textColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.normal,
+                    ),
+                  ),
+                // Show "Sold" status if booked
+                if (isBooked)
+                  Text(
+                    'Sold',
+                    style: TextStyle(
+                      color: outlineColor,
+                      fontSize: 9,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    // Compact grid style (no price) - for non-decker layouts
     return Tooltip(
       message: '$statusText - Seat ${seatIdentifier.toString()}',
       child: InkWell(
@@ -1423,57 +2267,22 @@ class _SeatWidget extends StatelessWidget {
           width: 50,
           height: 50,
           decoration: BoxDecoration(
-            color: backgroundColor,
+            color: backgroundColor ?? Colors.transparent,
             borderRadius: BorderRadius.circular(8),
             border: Border.all(
-              color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : (isBooked || isLocked || isNotAllowed)
-                      ? backgroundColor
-                      : Colors.grey[300]!,
-              width: isSelected ? 2.5 : (isBooked || isLocked || isNotAllowed) ? 2 : 1,
+              color: outlineColor,
+              width: isSelected ? 2.5 : (isBooked || isLocked || isNotAllowed) ? 2 : 1.5,
             ),
-            boxShadow: (isBooked || isLocked || isSelected)
-                ? [
-                    BoxShadow(
-                      color: backgroundColor.withOpacity(0.3),
-                      blurRadius: 4,
-                      offset: const Offset(0, 2),
-                    ),
-                  ]
-                : null,
           ),
-          child: Stack(
-            alignment: Alignment.center,
-            children: [
-              // Seat number/text
-              Text(
-                seatIdentifier.toString(),
-                style: TextStyle(
-                  color: textColor,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 11,
-                ),
+          child: Center(
+            child: Text(
+              seatIdentifier.toString(),
+              style: TextStyle(
+                color: textColor,
+                fontWeight: FontWeight.bold,
+                fontSize: 11,
               ),
-              // Status icon overlay (top-right corner)
-              if (icon != null && (isBooked || isLocked || isNotAllowed || isSelected))
-                Positioned(
-                  top: 2,
-                  right: 2,
-                  child: Container(
-                    padding: const EdgeInsets.all(2),
-                    decoration: BoxDecoration(
-                      color: backgroundColor,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      icon,
-                      color: textColor,
-                      size: 12,
-                    ),
-                  ),
-                ),
-            ],
+            ),
           ),
         ),
       ),
@@ -1504,18 +2313,18 @@ class _SeatLegend extends StatelessWidget {
           label: 'Available',
         ),
         _LegendItem(
-          color: Colors.red[300]!,
+          color: AppTheme.errorColor,
           label: 'Booked',
           icon: Icons.block,
         ),
         _LegendItem(
-          color: Colors.orange[300]!,
+          color: AppTheme.warningColor,
           label: 'Locked',
           icon: Icons.lock,
         ),
         if (hasRestrictedSeats)
           _LegendItem(
-            color: Colors.grey[300]!,
+            color: AppTheme.lightBorderColor,
             label: 'Not Allowed',
             icon: Icons.block,
           ),
@@ -1550,7 +2359,7 @@ class _LegendItem extends StatelessWidget {
           decoration: BoxDecoration(
             color: color,
             borderRadius: BorderRadius.circular(4),
-            border: Border.all(color: Colors.grey[300]!),
+            border: Border.all(color: AppTheme.lightBorderColor!),
           ),
           child: icon != null
               ? Icon(icon, size: 16, color: Colors.white)
@@ -1560,6 +2369,45 @@ class _LegendItem extends StatelessWidget {
         Text(
           label,
           style: Theme.of(context).textTheme.bodySmall,
+        ),
+      ],
+    );
+  }
+}
+
+class _LegendChip extends StatelessWidget {
+  final Color color;
+  final String label;
+  final IconData icon;
+
+  const _LegendChip({
+    required this.color,
+    required this.label,
+    required this.icon,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(6),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.15),
+            borderRadius: BorderRadius.circular(6),
+            border: Border.all(color: color, width: 1),
+          ),
+          child: Icon(icon, color: color, size: 18),
+        ),
+        const SizedBox(width: 6),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w500,
+            color: AppTheme.textPrimary,
+          ),
         ),
       ],
     );
@@ -1598,7 +2446,7 @@ class _SeatStatusItem extends StatelessWidget {
           label,
           style: TextStyle(
             fontSize: 10,
-            color: Colors.grey[600],
+            color: AppTheme.textSecondary,
           ),
         ),
       ],
@@ -1707,72 +2555,108 @@ class _PassengerInfoSection extends StatelessWidget {
               },
             ),
             const SizedBox(height: 24),
-            const Divider(),
-            const SizedBox(height: 16),
-            Row(
+            ExpansionTile(
+              title: Row(
+                children: [
+                  Icon(Icons.info_outline, size: 18, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Text(
+                    'Additional Information (Optional)',
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textSecondary,
+                        ),
+                  ),
+                ],
+              ),
+              subtitle: Text(
+                'Help us serve you better',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: AppTheme.textTertiary,
+                    ),
+              ),
               children: [
-                Icon(Icons.location_on, color: Theme.of(context).colorScheme.primary),
-                const SizedBox(width: 8),
-                Text(
-                  'Location & Luggage',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        fontWeight: FontWeight.bold,
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    children: [
+                      TextFormField(
+                        controller: pickupLocationController,
+                        decoration: InputDecoration(
+                          labelText: 'Pickup Location',
+                          helperText: 'Where will you board the bus?',
+                          hintText: 'e.g., Bus Park, City Center',
+                          prefixIcon: const Icon(Icons.place_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                        ),
                       ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: dropoffLocationController,
+                        decoration: InputDecoration(
+                          labelText: 'Dropoff Location',
+                          helperText: 'Where will you get off?',
+                          hintText: 'e.g., Bus Park, City Center',
+                          prefixIcon: const Icon(Icons.location_on_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+                      TextFormField(
+                        controller: luggageController,
+                        maxLines: 2,
+                        decoration: InputDecoration(
+                          labelText: 'Luggage Description',
+                          helperText: 'Describe your luggage for better handling',
+                          hintText: 'e.g., 2 suitcases, 1 backpack',
+                          prefixIcon: const Icon(Icons.luggage_outlined),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          filled: true,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 16),
-            TextFormField(
-              controller: pickupLocationController,
-              decoration: InputDecoration(
-                labelText: 'Pickup Location (Optional)',
-                hintText: 'e.g., Bus Park, City Center',
-                prefixIcon: const Icon(Icons.place_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: dropoffLocationController,
-              decoration: InputDecoration(
-                labelText: 'Dropoff Location (Optional)',
-                hintText: 'e.g., Bus Park, City Center',
-                prefixIcon: const Icon(Icons.location_on_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 16),
-            TextFormField(
-              controller: luggageController,
-              maxLines: 2,
-              decoration: InputDecoration(
-                labelText: 'Luggage Description (Optional)',
-                hintText: 'e.g., 2 suitcases, 1 backpack',
-                prefixIcon: const Icon(Icons.luggage_outlined),
-                border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                filled: true,
-              ),
-            ),
-            const SizedBox(height: 16),
             Row(
               children: [
-                Icon(Icons.shopping_bag_outlined, size: 20, color: Colors.grey[600]),
-                const SizedBox(width: 8),
-                Text(
-                  'Bag Count',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        fontWeight: FontWeight.w500,
-                      ),
+                Icon(
+                  Icons.shopping_bag_outlined, 
+                  size: 20, 
+                  color: AppTheme.textSecondary,
                 ),
-                const Spacer(),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'Bag Count',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w500,
+                              color: AppTheme.textPrimary,
+                            ),
+                      ),
+                      Text(
+                        'Optional (0-10 bags)',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                              fontSize: 11,
+                            ),
+                      ),
+                    ],
+                  ),
+                ),
                 Row(
                   children: [
                     IconButton(
@@ -1780,28 +2664,39 @@ class _PassengerInfoSection extends StatelessWidget {
                       onPressed: bagCount > 0
                           ? () => onBagCountChanged(bagCount - 1)
                           : null,
-                      color: Theme.of(context).colorScheme.primary,
+                      color: bagCount > 0 
+                          ? Theme.of(context).colorScheme.primary
+                          : AppTheme.textTertiary,
                     ),
                     Container(
-                      width: 60,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      width: 50,
+                      height: 40,
+                      alignment: Alignment.center,
                       decoration: BoxDecoration(
-                        color: Theme.of(context).colorScheme.primaryContainer,
+                        color: AppTheme.surfaceColor,
                         borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: AppTheme.lightBorderColor,
+                          width: 1,
+                        ),
                       ),
                       child: Text(
                         bagCount.toString(),
                         textAlign: TextAlign.center,
-                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                        style: Theme.of(context).textTheme.titleLarge?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: Theme.of(context).colorScheme.primary,
+                              color: AppTheme.textPrimary,
                             ),
                       ),
                     ),
                     IconButton(
                       icon: const Icon(Icons.add_circle_outline),
-                      onPressed: () => onBagCountChanged(bagCount + 1),
-                      color: Theme.of(context).colorScheme.primary,
+                      onPressed: bagCount < 10
+                          ? () => onBagCountChanged(bagCount + 1)
+                          : null,
+                      color: bagCount < 10
+                          ? Theme.of(context).colorScheme.primary
+                          : AppTheme.textTertiary,
                     ),
                   ],
                 ),
@@ -1850,6 +2745,7 @@ class _PaymentMethodSection extends StatelessWidget {
                   child: _PaymentMethodOption(
                     icon: Icons.money,
                     label: 'Cash',
+                    description: 'Pay at counter',
                     value: 'cash',
                     isSelected: selectedPaymentMethod == 'cash',
                     onTap: () => onPaymentMethodChanged('cash'),
@@ -1858,8 +2754,9 @@ class _PaymentMethodSection extends StatelessWidget {
                 const SizedBox(width: 12),
                 Expanded(
                   child: _PaymentMethodOption(
-                    icon: Icons.credit_card,
+                    icon: Icons.payment,
                     label: 'Online',
+                    description: 'eSewa / Khalti',
                     value: 'online',
                     isSelected: selectedPaymentMethod == 'online',
                     onTap: () => onPaymentMethodChanged('online'),
@@ -1877,6 +2774,7 @@ class _PaymentMethodSection extends StatelessWidget {
 class _PaymentMethodOption extends StatelessWidget {
   final IconData icon;
   final String label;
+  final String? description;
   final String value;
   final bool isSelected;
   final VoidCallback onTap;
@@ -1884,6 +2782,7 @@ class _PaymentMethodOption extends StatelessWidget {
   const _PaymentMethodOption({
     required this.icon,
     required this.label,
+    this.description,
     required this.value,
     required this.isSelected,
     required this.onTap,
@@ -1891,6 +2790,9 @@ class _PaymentMethodOption extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(12),
@@ -1898,35 +2800,57 @@ class _PaymentMethodOption extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: isSelected
-              ? Theme.of(context).colorScheme.primaryContainer
-              : Colors.grey[100],
+              ? theme.colorScheme.primaryContainer
+              : isDark
+                  ? AppTheme.textPrimary
+                  : AppTheme.surfaceColor,
           borderRadius: BorderRadius.circular(12),
           border: Border.all(
             color: isSelected
-                ? Theme.of(context).colorScheme.primary
-                : Colors.grey[300]!,
+                ? theme.colorScheme.primary
+                : isDark
+                    ? AppTheme.textSecondary!
+                    : AppTheme.lightBorderColor!,
             width: isSelected ? 2 : 1,
           ),
         ),
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             Icon(
               icon,
               color: isSelected
-                  ? Theme.of(context).colorScheme.primary
-                  : Colors.grey[600],
+                  ? theme.colorScheme.primary
+                  : (value == 'cash' 
+                      ? AppTheme.successColor  // Green for Cash
+                      : AppTheme.statusInfo), // Blue for Online
               size: 32,
             ),
             const SizedBox(height: 8),
             Text(
               label,
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              style: theme.textTheme.bodyMedium?.copyWith(
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w600,
                     color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : Colors.grey[700],
+                        ? theme.colorScheme.primary
+                        : (value == 'cash' 
+                            ? AppTheme.successColor  // Green for Cash
+                            : AppTheme.statusInfo), // Blue for Online
                   ),
             ),
+            if (description != null) ...[
+              const SizedBox(height: 4),
+              Text(
+                description!,
+                style: theme.textTheme.bodySmall?.copyWith(
+                      color: isSelected
+                          ? theme.colorScheme.primary.withOpacity(0.7)
+                          : AppTheme.textSecondary,
+                      fontSize: 11,
+                    ),
+                textAlign: TextAlign.center,
+              ),
+            ],
           ],
         ),
       ),
@@ -1938,16 +2862,20 @@ class _BookingSummarySection extends StatelessWidget {
   final BusInfoEntity bus;
   final List<dynamic> selectedSeats; // Supports both int (legacy) and String (new format)
   final String paymentMethod;
+  final double walletBalance;
 
   const _BookingSummarySection({
     required this.bus,
     required this.selectedSeats,
     required this.paymentMethod,
+    required this.walletBalance,
   });
 
   @override
   Widget build(BuildContext context) {
     final totalPrice = bus.price * selectedSeats.length;
+    final hasInsufficientBalance = walletBalance < totalPrice;
+    final remainingBalance = walletBalance - totalPrice;
     
     return Card(
       color: Theme.of(context).colorScheme.primaryContainer,
@@ -1978,7 +2906,133 @@ class _BookingSummarySection extends StatelessWidget {
               value: 'Rs. ${NumberFormat('#,##0').format(totalPrice)}',
               isTotal: true,
             ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 12),
+            // Wallet Balance Section
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: hasInsufficientBalance 
+                    ? AppTheme.errorColor.withOpacity(0.1)
+                    : AppTheme.successColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(
+                  color: hasInsufficientBalance 
+                      ? AppTheme.errorColor.withOpacity(0.3)
+                      : AppTheme.successColor.withOpacity(0.3),
+                  width: 1.5,
+                ),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.account_balance_wallet,
+                        size: 18,
+                        color: hasInsufficientBalance 
+                            ? AppTheme.errorColor
+                            : AppTheme.successColor,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        'Wallet Balance',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.w600,
+                              color: hasInsufficientBalance 
+                                  ? AppTheme.errorColor
+                                  : AppTheme.textPrimary,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Current Balance',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                      Text(
+                        'Rs. ${NumberFormat('#,##0.00').format(walletBalance)}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: hasInsufficientBalance 
+                                  ? AppTheme.errorColor
+                                  : AppTheme.textPrimary,
+                            ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        'Required Amount',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: AppTheme.textSecondary,
+                            ),
+                      ),
+                      Text(
+                        'Rs. ${NumberFormat('#,##0.00').format(totalPrice)}',
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.textPrimary,
+                            ),
+                      ),
+                    ],
+                  ),
+                  if (!hasInsufficientBalance) ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          'Remaining Balance',
+                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                color: AppTheme.successColor,
+                                fontWeight: FontWeight.w600,
+                              ),
+                        ),
+                        Text(
+                          'Rs. ${NumberFormat('#,##0.00').format(remainingBalance)}',
+                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: AppTheme.successColor,
+                              ),
+                        ),
+                      ],
+                    ),
+                  ] else ...[
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.warning_amber_rounded,
+                          size: 16,
+                          color: AppTheme.errorColor,
+                        ),
+                        const SizedBox(width: 4),
+                        Expanded(
+                          child: Text(
+                            'Insufficient balance. Add Rs. ${NumberFormat('#,##0.00').format(totalPrice - walletBalance)}',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: AppTheme.errorColor,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const SizedBox(height: 12),
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
@@ -1987,7 +3041,7 @@ class _BookingSummarySection extends StatelessWidget {
               ),
               child: Row(
                 children: [
-                  Icon(Icons.payment, size: 16, color: Colors.grey[600]),
+                  Icon(Icons.payment, size: 16, color: AppTheme.textSecondary),
                   const SizedBox(width: 8),
                   Text(
                     'Payment: ${paymentMethod.toUpperCase()}',
@@ -1996,6 +3050,21 @@ class _BookingSummarySection extends StatelessWidget {
                 ],
               ),
             ),
+            if (hasInsufficientBalance) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => context.go('/wallet'),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Add Money to Wallet'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppTheme.errorColor,
+                    side: BorderSide(color: AppTheme.errorColor),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -2089,7 +3158,7 @@ class _SelectedBusAndSeatsSummary extends StatelessWidget {
                       Text(
                         'Review your selection',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[600],
+                              color: AppTheme.textSecondary,
                             ),
                       ),
                     ],
@@ -2123,22 +3192,22 @@ class _SelectedBusAndSeatsSummary extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.access_time, size: 14, color: Colors.grey[600]),
+                          Icon(Icons.access_time, size: 14, color: AppTheme.textSecondary),
                           const SizedBox(width: 4),
                           Text(
                             '${bus.time}${bus.arrival != null ? ' - ${bus.arrival}' : ''}',
                             style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.grey[600],
+                                  color: AppTheme.textSecondary,
                                 ),
                           ),
                           const SizedBox(width: 12),
-                          Icon(Icons.event, size: 14, color: Colors.grey[600]),
+                          Icon(Icons.event, size: 14, color: AppTheme.textSecondary),
                           const SizedBox(width: 4),
                           Flexible(
                             child: Text(
                               DateFormat('MMM d, y').format(bus.date),
                               style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Colors.grey[600],
+                                    color: AppTheme.textSecondary,
                                   ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -2205,7 +3274,7 @@ class _SelectedBusAndSeatsSummary extends StatelessWidget {
                       Text(
                         '${selectedSeats.length} seat${selectedSeats.length > 1 ? 's' : ''} selected',
                         style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: Colors.grey[600],
+                              color: AppTheme.textSecondary,
                             ),
                       ),
                     ],

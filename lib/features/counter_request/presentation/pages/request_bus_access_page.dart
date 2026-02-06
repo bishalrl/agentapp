@@ -8,6 +8,7 @@ import '../../../../core/injection/injection.dart' as di;
 import '../../../../core/widgets/enhanced_card.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/widgets/back_button_handler.dart';
 import '../../../../features/booking/domain/usecases/get_bus_details.dart' as booking_usecases;
 import '../../../../features/booking/domain/entities/booking_entity.dart';
 import '../../../../features/bus_management/presentation/bloc/bus_bloc.dart';
@@ -133,6 +134,28 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
     });
   }
 
+  void _submitRequest(BuildContext context) {
+    final busId = _searchedBus?.id ?? _busDetails?.id;
+    if (busId != null) {
+      context.read<CounterRequestBloc>().add(
+            RequestBusAccessEvent(
+              busId: busId,
+              requestedSeats: _selectedSeats, // Can be empty for general access request
+              message: _messageController.text.trim().isEmpty
+                  ? null
+                  : _messageController.text.trim(),
+            ),
+          );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please search and select a bus first'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MultiBlocProvider(
@@ -140,14 +163,22 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
         BlocProvider(create: (context) => di.sl<CounterRequestBloc>()),
         BlocProvider(create: (context) => di.sl<BusBloc>()),
       ],
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Request Bus Access'),
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () => context.pop(),
+      child: BackButtonHandler(
+        enableDoubleBackToExit: false,
+        child: Scaffold(
+          appBar: AppBar(
+            title: const Text('Request Bus Access'),
+            leading: IconButton(
+              icon: const Icon(Icons.arrow_back),
+              onPressed: () {
+                if (context.canPop()) {
+                  context.pop();
+                } else {
+                  context.go('/dashboard');
+                }
+              },
+            ),
           ),
-        ),
         body: BlocConsumer<CounterRequestBloc, CounterRequestState>(
           listener: (context, state) {
             if (state.errorMessage != null) {
@@ -213,7 +244,7 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
               ScaffoldMessenger.of(context).showSnackBar(
                 const SnackBar(
                   content: Text('Bus access request submitted successfully!'),
-                  backgroundColor: Colors.green,
+                  backgroundColor: AppTheme.successColor,
                 ),
               );
               // Navigate back after a short delay
@@ -350,13 +381,13 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
                           children: [
                             Row(
                               children: [
-                                Icon(Icons.check_circle, color: Colors.green),
+                                Icon(Icons.check_circle, color: AppTheme.successColor),
                                 const SizedBox(width: AppTheme.spacingS),
                                 Text(
                                   'Bus Found',
                                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.green,
+                                        color: AppTheme.successColor,
                                       ),
                                 ),
                               ],
@@ -400,18 +431,18 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
                       Container(
                         padding: const EdgeInsets.all(AppTheme.spacingM),
                         decoration: BoxDecoration(
-                          color: Colors.red.shade50,
+                          color: AppTheme.errorColor.withOpacity(0.1),
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red.shade200),
+                          border: Border.all(color: AppTheme.errorColor.withOpacity(0.5)),
                         ),
                         child: Row(
                           children: [
-                            Icon(Icons.error_outline, color: Colors.red.shade700),
+                            Icon(Icons.error_outline, color: AppTheme.errorColor),
                             const SizedBox(width: AppTheme.spacingS),
                             Expanded(
                               child: Text(
                                 _busDetailsError!,
-                                style: TextStyle(color: Colors.red.shade700),
+                                style: TextStyle(color: AppTheme.errorColor),
                               ),
                             ),
                           ],
@@ -427,13 +458,13 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
                         Container(
                           padding: const EdgeInsets.all(AppTheme.spacingM),
                           decoration: BoxDecoration(
-                            color: Colors.green.shade50,
+                            color: AppTheme.successColor.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.green.shade200),
+                            border: Border.all(color: AppTheme.successColor.withOpacity(0.5)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.check_circle, color: Colors.green.shade700, size: 24),
+                              Icon(Icons.check_circle, color: AppTheme.successColor, size: 24),
                               const SizedBox(width: AppTheme.spacingS),
                               Expanded(
                                 child: Column(
@@ -443,7 +474,7 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
                                       'You already have access to this bus',
                                       style: TextStyle(
                                         fontWeight: FontWeight.bold,
-                                        color: Colors.green.shade700,
+                                        color: AppTheme.successColor,
                                       ),
                                     ),
                                     if (_busDetails!.hasRestrictedAccess == true && 
@@ -455,7 +486,7 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
                                           'Allowed seats: ${_busDetails!.allowedSeats!.map((s) => s.toString()).join(', ')}',
                                           style: TextStyle(
                                             fontSize: 12,
-                                            color: Colors.green.shade700,
+                                            color: AppTheme.successColor,
                                           ),
                                         ),
                                       ),
@@ -467,34 +498,39 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
                         ),
                       ],
                       
-                      // Seat Selection (only show if no access or if we have seat info)
-                      if (_busDetails!.hasAccess != true || 
-                          (_busDetails!.totalSeats > 0 && 
-                           (_busDetails!.seatConfiguration != null || _busDetails!.totalSeats > 0))) ...[
+                      // Seat Selection - Always show if bus has seats, regardless of access status
+                      // User should be able to request access to any seat
+                      // Show seat selection if:
+                      // 1. Bus has totalSeats > 0, OR
+                      // 2. Bus has seatConfiguration, OR  
+                      // 3. Always show (even if 0 seats) to allow general access request
+                      if (_busDetails!.totalSeats > 0 || 
+                          (_busDetails!.seatConfiguration != null && _busDetails!.seatConfiguration!.isNotEmpty)) ...[
                         const SizedBox(height: AppTheme.spacingM),
                         _SeatSelectionCard(
                           bus: _busDetails!,
                           selectedSeats: _selectedSeats,
                           onSeatToggled: _toggleSeat,
                         ),
-                      ] else if (_busDetails!.hasAccess == true && _busDetails!.totalSeats == 0) ...[
+                      ] else if (_busDetails!.totalSeats == 0 && 
+                                 (_busDetails!.seatConfiguration == null || _busDetails!.seatConfiguration!.isEmpty)) ...[
                         const SizedBox(height: AppTheme.spacingM),
                         Container(
                           padding: const EdgeInsets.all(AppTheme.spacingM),
                           decoration: BoxDecoration(
-                            color: Colors.blue.shade50,
+                            color: AppTheme.statusInfo.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.blue.shade200),
+                            border: Border.all(color: AppTheme.statusInfo.withOpacity(0.5)),
                           ),
                           child: Row(
                             children: [
-                              Icon(Icons.info_outline, color: Colors.blue.shade700, size: 24),
+                              Icon(Icons.info_outline, color: AppTheme.statusInfo, size: 24),
                               const SizedBox(width: AppTheme.spacingS),
                               Expanded(
                                 child: Text(
-                                  'Seat information is not available. You may still request access.',
+                                  'Seat information is not available. You can still request access without specifying seats.',
                                   style: TextStyle(
-                                    color: Colors.blue.shade700,
+                                    color: AppTheme.statusInfo,
                                   ),
                                 ),
                               ),
@@ -535,39 +571,42 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
                         width: double.infinity,
                         child: ElevatedButton(
                           onPressed: (state.isLoading || 
-                                      _selectedSeats.isEmpty || 
                                       (_searchedBus == null && _busDetails == null))
                               ? null
                               : () {
                                   if (_formKey.currentState!.validate()) {
-                                    if (_selectedSeats.isEmpty) {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Please select at least one seat'),
-                                          backgroundColor: Colors.red,
+                                    // Allow submitting even without seat selection
+                                    // If no seats selected, request will be for general access
+                                    if (_selectedSeats.isEmpty && 
+                                        (_busDetails?.totalSeats ?? 0) > 0) {
+                                      // Show warning but allow submission
+                                      showDialog(
+                                        context: context,
+                                        builder: (context) => AlertDialog(
+                                          title: const Text('No Seats Selected'),
+                                          content: const Text(
+                                            'You haven\'t selected any specific seats. '
+                                            'This will request general access to the bus. '
+                                            'Do you want to continue?',
+                                          ),
+                                          actions: [
+                                            TextButton(
+                                              onPressed: () => Navigator.pop(context),
+                                              child: const Text('Cancel'),
+                                            ),
+                                            ElevatedButton(
+                                              onPressed: () {
+                                                Navigator.pop(context);
+                                                _submitRequest(context);
+                                              },
+                                              child: const Text('Continue'),
+                                            ),
+                                          ],
                                         ),
                                       );
                                       return;
                                     }
-                                    final busId = _searchedBus?.id ?? _busDetails?.id;
-                                    if (busId != null) {
-                                      context.read<CounterRequestBloc>().add(
-                                            RequestBusAccessEvent(
-                                              busId: busId,
-                                              requestedSeats: _selectedSeats,
-                                              message: _messageController.text.trim().isEmpty
-                                                  ? null
-                                                  : _messageController.text.trim(),
-                                            ),
-                                          );
-                                    } else {
-                                      ScaffoldMessenger.of(context).showSnackBar(
-                                        const SnackBar(
-                                          content: Text('Please search and select a bus first'),
-                                          backgroundColor: Colors.red,
-                                        ),
-                                      );
-                                    }
+                                    _submitRequest(context);
                                   }
                                 },
                           style: ElevatedButton.styleFrom(
@@ -590,6 +629,7 @@ class _RequestBusAccessPageState extends State<RequestBusAccessPage> {
           },
         ),
       ),
+        ),
     );
   }
 }
@@ -738,23 +778,9 @@ class _SeatSelectionCard extends StatelessWidget {
       seatIdentifiers = List.generate(bus.totalSeats, (index) => (index + 1).toString());
     }
 
-    // For request access page, we show all seats so user can request access to them
-    // However, if hasAccess is true and hasRestrictedAccess is true, we can show which seats are already allowed
-    // If hasAccess is false, we still show all seats (since this is a request page)
-    // Only filter if hasNoAccess is explicitly true (meaning access was denied)
-    if (bus.hasNoAccess == true && bus.hasAccess == false) {
-      // Access was explicitly denied - show no seats
-      seatIdentifiers = [];
-    } else if (bus.hasAccess == true && bus.hasRestrictedAccess == true) {
-      // Already has restricted access - show allowed seats (user can request more)
-      if (bus.allowedSeats != null && bus.allowedSeats!.isNotEmpty) {
-        // Show allowed seats, but user can still request access to other seats
-        // For now, show all seats but highlight allowed ones
-        // seatIdentifiers remains unchanged - show all seats
-      }
-      // Note: We don't filter here because this is a request page - user should see all seats
-    }
-    // For request access page, we generally show all seats regardless of current access status
+    // For request access page, ALWAYS show all seats regardless of access status
+    // User should be able to request access to any seat, even if they already have access to some
+    // Don't filter seats - show everything so user can request what they need
 
     return EnhancedCard(
       child: Column(
@@ -779,13 +805,13 @@ class _SeatSelectionCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
-                color: Colors.orange.shade50,
+                color: AppTheme.warningColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.orange.shade200),
+                border: Border.all(color: AppTheme.warningColor.withOpacity(0.5)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.info_outline, color: Colors.orange.shade700, size: 20),
+                  Icon(Icons.info_outline, color: AppTheme.warningColor, size: 20),
                   const SizedBox(width: AppTheme.spacingS),
                   Expanded(
                     child: Text(
@@ -794,7 +820,7 @@ class _SeatSelectionCard extends StatelessWidget {
                           : 'Restricted Access: No seats available for request.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.orange.shade700,
+                        color: AppTheme.warningColor,
                       ),
                     ),
                   ),
@@ -806,20 +832,20 @@ class _SeatSelectionCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
-                color: Colors.red.shade50,
+                color: AppTheme.errorColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.red.shade200),
+                border: Border.all(color: AppTheme.errorColor.withOpacity(0.5)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.block, color: Colors.red.shade700, size: 20),
+                  Icon(Icons.block, color: AppTheme.errorColor, size: 20),
                   const SizedBox(width: AppTheme.spacingS),
                   Expanded(
                     child: Text(
                       'No Access: You do not have permission to request seats on this bus.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.red.shade700,
+                        color: AppTheme.errorColor,
                       ),
                     ),
                   ),
@@ -831,20 +857,20 @@ class _SeatSelectionCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
-                color: Colors.green.shade50,
+                color: AppTheme.successColor.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.green.shade200),
+                border: Border.all(color: AppTheme.successColor.withOpacity(0.5)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.green.shade700, size: 20),
+                  Icon(Icons.check_circle, color: AppTheme.successColor, size: 20),
                   const SizedBox(width: AppTheme.spacingS),
                   Expanded(
                     child: Text(
                       'Full Access: You can request any available seat.',
                       style: TextStyle(
                         fontSize: 12,
-                        color: Colors.green.shade700,
+                        color: AppTheme.successColor,
                       ),
                     ),
                   ),
@@ -892,18 +918,18 @@ class _SeatSelectionCard extends StatelessWidget {
             Container(
               padding: const EdgeInsets.all(AppTheme.spacingS),
               decoration: BoxDecoration(
-                color: Colors.blue.shade50,
+                color: AppTheme.statusInfo.withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.check_circle, color: Colors.blue.shade700, size: 20),
+                  Icon(Icons.check_circle, color: AppTheme.statusInfo, size: 20),
                   const SizedBox(width: AppTheme.spacingS),
                   Expanded(
                     child: Text(
                       'Selected: ${selectedSeats.join(', ')} (${selectedSeats.length} seat${selectedSeats.length > 1 ? 's' : ''})',
                       style: TextStyle(
-                        color: Colors.blue.shade700,
+                        color: AppTheme.statusInfo,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
