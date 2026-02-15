@@ -134,7 +134,7 @@ class _DashboardContent extends StatelessWidget {
             _UpcomingBusesSection(assignedBuses: dashboard.assignedBuses),
             const SizedBox(height: AppTheme.spacingXL),
 
-            // Recent Activity (placeholder - would need additional data)
+            // Recent Activity (links to bookings; no fake activity items)
             SectionHeader(
               title: 'Recent Activity',
               actionLabel: 'View All',
@@ -142,7 +142,7 @@ class _DashboardContent extends StatelessWidget {
               showDivider: false,
             ),
             const SizedBox(height: AppTheme.spacingM),
-            _RecentActivityPlaceholder(),
+            _RecentActivityCta(),
           ],
         ),
       ),
@@ -270,7 +270,6 @@ class _QuickActionsRow extends StatelessWidget {
             label: 'Request Access',
             onTap: () => context.go('/counter/request-bus-access'),
             iconColor: AppTheme.warningColor,
-            badgeCount: 2, // Example: pending requests
           ),
           const SizedBox(width: AppTheme.spacingM),
           QuickActionCard(
@@ -313,8 +312,6 @@ class _MetricsGrid extends StatelessWidget {
                 label: 'Today\'s Bookings',
                 icon: Icons.confirmation_number,
                 color: AppTheme.statusInfo,
-                trendValue: 12.5, // Example trend
-                trendLabel: '+12.5% vs yesterday',
                 onTap: () => context.go('/bookings'),
               ),
             ),
@@ -325,8 +322,6 @@ class _MetricsGrid extends StatelessWidget {
                 label: 'Total Sales',
                 icon: Icons.currency_rupee,
                 color: AppTheme.successColor,
-                trendValue: 8.3,
-                trendLabel: '+8.3% vs yesterday',
                 onTap: () => context.go('/sales'),
               ),
             ),
@@ -337,7 +332,7 @@ class _MetricsGrid extends StatelessWidget {
           children: [
             Expanded(
               child: MetricCard(
-                value: '2', // Example: pending requests
+                value: '—',
                 label: 'Pending Requests',
                 icon: Icons.pending_actions,
                 color: AppTheme.warningColor,
@@ -513,92 +508,52 @@ class _UpcomingBusesSection extends StatelessWidget {
   }
 }
 
-class _RecentActivityPlaceholder extends StatelessWidget {
-  const _RecentActivityPlaceholder();
+/// CTA to view bookings; no hardcoded activity items.
+class _RecentActivityCta extends StatelessWidget {
+  const _RecentActivityCta();
 
   @override
   Widget build(BuildContext context) {
     return EnhancedCard(
       padding: const EdgeInsets.all(AppTheme.spacingL),
-      child: Column(
+      onTap: () => context.go('/bookings'),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppTheme.successColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
-                ),
-                child: const Icon(
-                  Icons.check_circle,
-                  color: AppTheme.successColor,
-                  size: 20,
-                ),
-              ),
-              const SizedBox(width: AppTheme.spacingM),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Booking confirmed',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    Text(
-                      '2 hours ago',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: AppTheme.primaryColor.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(AppTheme.radiusS),
+            ),
+            child: const Icon(
+              Icons.receipt_long,
+              color: AppTheme.primaryColor,
+              size: 24,
+            ),
           ),
-          const SizedBox(height: AppTheme.spacingM),
-          const Divider(),
-          const SizedBox(height: AppTheme.spacingM),
-          Row(
-            children: [
-              Container(
-                width: 40,
-                height: 40,
-                decoration: BoxDecoration(
-                  color: AppTheme.statusInfo.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(AppTheme.radiusS),
+          const SizedBox(width: AppTheme.spacingM),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'View your bookings',
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.w600,
+                      ),
                 ),
-                child: const Icon(
-                  Icons.request_quote,
-                  color: AppTheme.statusInfo,
-                  size: 20,
+                const SizedBox(height: 4),
+                Text(
+                  'See all bookings and recent activity',
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: AppTheme.textSecondary,
+                      ),
                 ),
-              ),
-              const SizedBox(width: AppTheme.spacingM),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      'Bus access requested',
-                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                            fontWeight: FontWeight.w600,
-                          ),
-                    ),
-                    Text(
-                      '5 hours ago',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: AppTheme.textSecondary,
-                          ),
-                    ),
-                  ],
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
+          Icon(Icons.arrow_forward_ios, size: 14, color: AppTheme.textSecondary),
         ],
       ),
     );

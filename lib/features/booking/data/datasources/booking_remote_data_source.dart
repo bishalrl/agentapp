@@ -1,6 +1,7 @@
 import '../../../../core/constants/api_constants.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/network/api_client.dart';
+import '../../../../core/utils/phone_normalizer.dart';
 import '../models/booking_model.dart';
 
 abstract class BookingRemoteDataSource {
@@ -242,11 +243,16 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
       
       print('   Seat numbers (normalized): $seatNumbersForApi');
       
+      final normalizedContact = PhoneNormalizer.normalizeNepalPhone(contactNumber);
+      final contactForApi = PhoneNormalizer.isValidNormalizedNepalMobile(normalizedContact)
+          ? normalizedContact
+          : contactNumber;
+
       final body = <String, dynamic>{
         'busId': busId,
         'seatNumbers': seatNumbersForApi,
         'passengerName': passengerName,
-        'contactNumber': contactNumber,
+        'contactNumber': contactForApi,
         'paymentMethod': paymentMethod,
       };
       
@@ -278,58 +284,68 @@ class BookingRemoteDataSourceImpl implements BookingRemoteDataSource {
       );
       
       print('📥 BookingRemoteDataSource.createBooking: Response received');
-      print('   Success: ${response['success']}');
-      
+      print('   Success: ${response['success']}, has data: ${response['data'] != null}, has booking: ${response['booking'] != null}');
+
+      // Accept multiple success shapes: { success, data: { booking? } }, or { booking }, or booking at top level
+      Map<String, dynamic>? bookingData;
       if (response['success'] == true && response['data'] != null) {
         final data = response['data'] as Map<String, dynamic>;
-        // Handle response format: data can have 'booking' key or be booking object directly
-        final bookingData = data['booking'] ?? data;
-        
-        if (bookingData is! Map<String, dynamic>) {
-          throw ServerException('Invalid booking data format in response');
-        }
-        
+        final raw = data['booking'] ?? data;
+        if (raw is Map<String, dynamic>) bookingData = raw;
+      }
+      if (bookingData == null && response['booking'] != null) {
+        final raw = response['booking'];
+        if (raw is Map<String, dynamic>) bookingData = raw;
+      }
+      if (bookingData == null &&
+          (response['id'] != null || response['_id'] != null) &&
+          (response['busId'] != null || response['seatNumbers'] != null)) {
+        bookingData = Map<String, dynamic>.from(response);
+      }
+
+      if (bookingData != null) {
         print('   ✅ Parsing booking data');
         return BookingModel.fromJson(bookingData);
-      } else {
+      }
+
+      // Response was not recognized as success — log for debugging
+      print('   ⚠️ Create booking response not in expected success format. Keys: ${response.keys}');
+
+      {
         // Enhanced error handling for new backend error format with debug information
         final message = response['message'] as String? ?? 'Failed to create booking';
         final allowedSeats = response['allowedSeats'] as List<dynamic>?;
         final allowedSeatsAsStrings = response['allowedSeatsAsStrings'] as List<dynamic>?;
-        final allowedSeatsAsNumbers = response['allowedSeatsAsNumbers'] as List<dynamic>?;
         final requestedSeats = response['requestedSeats'] as List<dynamic>?;
-        final requestedSeatsNormalized = response['requestedSeatsNormalized'] as List<dynamic>?;
         final notAllowedSeats = response['notAllowedSeats'] as List<dynamic>?;
         final debug = response['debug'] as Map<String, dynamic>?;
         
-        // Log debug information for troubleshooting
+        // Log debug information for troubleshooting (do not show raw backend text to user)
         print('❌ BookingRemoteDataSource.createBooking: Error response');
         print('   Message: $message');
         print('   Allowed Seats: $allowedSeats');
         print('   Allowed Seats (as strings): $allowedSeatsAsStrings');
-        print('   Allowed Seats (as numbers): $allowedSeatsAsNumbers');
         print('   Requested Seats: $requestedSeats');
-        print('   Requested Seats (normalized): $requestedSeatsNormalized');
         print('   Not Allowed Seats: $notAllowedSeats');
         if (debug != null) {
           print('   Debug Info: $debug');
         }
         
-        // Build detailed error message
-        String errorMessage = message;
-        if (notAllowedSeats != null && notAllowedSeats.isNotEmpty) {
-          final notAllowedStr = notAllowedSeats.map((s) => s.toString()).join(', ');
-          if (allowedSeatsAsStrings != null && allowedSeatsAsStrings.isNotEmpty) {
-            final allowedStr = allowedSeatsAsStrings.map((s) => s.toString()).join(', ');
-            errorMessage = '$message\n\nNot allowed seats: $notAllowedStr\nAllowed seats: $allowedStr';
-          } else {
-            errorMessage = '$message\n\nNot allowed seats: $notAllowedStr';
-          }
-        } else if (allowedSeatsAsStrings != null && allowedSeatsAsStrings.isEmpty) {
-          errorMessage = '$message\n\nYou do not have permission to book any seats on this bus.';
-        }
+        // Return a user-friendly message only — never expose "Not allowed seats", "Allowed seats", or raw backend text
+        final bool isSeatPermissionError = (notAllowedSeats != null && notAllowedSeats.isNotEmpty) ||
+            (allowedSeatsAsStrings != null && allowedSeatsAsStrings.isEmpty);
+        final String userMessage = isSeatPermissionError
+            ? 'Booking could not be completed. Your counter does not have permission to book these seats on this bus. '
+              'If you have sufficient wallet balance and are paying by wallet, request bus access for this counter or contact support.'
+            : (message.length > 200 ||
+                    message.toLowerCase().contains('not allowed') ||
+                    message.toLowerCase().contains('allowed seats') ||
+                    message.toLowerCase().contains('requestedSeats') ||
+                    message.toLowerCase().contains('notAllowedSeats')
+                ? 'Booking could not be completed. Please try again or contact support.'
+                : message);
         
-        throw ServerException(errorMessage);
+        throw ServerException(userMessage);
       }
     } on ServerException {
       rethrow;

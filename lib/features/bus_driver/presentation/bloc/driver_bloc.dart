@@ -11,9 +11,13 @@ import '../../domain/usecases/driver_login.dart';
 import '../../domain/usecases/get_driver_dashboard.dart';
 import '../../domain/usecases/update_driver_profile.dart';
 import '../../domain/usecases/mark_bus_as_reached.dart';
+import '../../domain/usecases/stop_location_sharing.dart';
 import '../../domain/usecases/get_pending_requests.dart';
 import '../../domain/usecases/accept_request.dart';
 import '../../domain/usecases/reject_request.dart';
+import '../../domain/usecases/get_owner_invitations.dart';
+import '../../domain/usecases/accept_owner_invitation.dart';
+import '../../domain/usecases/reject_owner_invitation.dart';
 import '../../domain/usecases/get_bus_details.dart';
 import '../../domain/usecases/initiate_ride.dart';
 import '../../domain/usecases/update_driver_location.dart';
@@ -37,9 +41,13 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
   final GetDriverDashboard getDashboard;
   final UpdateDriverProfile updateProfile;
   final MarkBusAsReached markBusAsReached;
+  final StopLocationSharing stopLocationSharing;
   final GetPendingRequests getPendingRequests;
   final AcceptRequest acceptRequest;
   final RejectRequest rejectRequest;
+  final GetOwnerInvitations getOwnerInvitations;
+  final AcceptOwnerInvitation acceptOwnerInvitation;
+  final RejectOwnerInvitation rejectOwnerInvitation;
   final GetBusDetails getBusDetails;
   final InitiateRide initiateRide;
   final UpdateDriverLocation updateDriverLocation;
@@ -59,9 +67,13 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
     required this.getDashboard,
     required this.updateProfile,
     required this.markBusAsReached,
+    required this.stopLocationSharing,
     required this.getPendingRequests,
     required this.acceptRequest,
     required this.rejectRequest,
+    required this.getOwnerInvitations,
+    required this.acceptOwnerInvitation,
+    required this.rejectOwnerInvitation,
     required this.getBusDetails,
     required this.initiateRide,
     required this.updateDriverLocation,
@@ -81,9 +93,13 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
     on<GetDriverDashboardEvent>(_onGetDriverDashboard);
     on<UpdateDriverProfileEvent>(_onUpdateProfile);
     on<MarkBusAsReachedEvent>(_onMarkBusAsReached);
+    on<StopLocationSharingEvent>(_onStopLocationSharing);
     on<GetPendingRequestsEvent>(_onGetPendingRequests);
     on<AcceptRequestEvent>(_onAcceptRequest);
     on<RejectRequestEvent>(_onRejectRequest);
+    on<GetOwnerInvitationsEvent>(_onGetOwnerInvitations);
+    on<AcceptOwnerInvitationEvent>(_onAcceptOwnerInvitation);
+    on<RejectOwnerInvitationEvent>(_onRejectOwnerInvitation);
     on<GetBusDetailsEvent>(_onGetBusDetails);
     on<InitiateRideEvent>(_onInitiateRide);
     on<UpdateDriverLocationEvent>(_onUpdateDriverLocation);
@@ -352,13 +368,19 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
     }
   }
 
+  static const Duration _dashboardThrottle = Duration(minutes: 5);
+
   Future<void> _onGetDriverDashboard(
     GetDriverDashboardEvent event,
     Emitter<DriverState> emit,
   ) async {
+    if (!event.forceRefresh &&
+        state.lastDashboardFetchTime != null &&
+        DateTime.now().difference(state.lastDashboardFetchTime!) < _dashboardThrottle) {
+      return; // Skip API call to avoid hammering the database
+    }
     print('🔵 DriverBloc._onGetDriverDashboard called');
     emit(state.copyWith(isLoading: true, errorMessage: null));
-    print('   State emitted: isLoading=true');
 
     final result = await getDashboard();
 
@@ -372,12 +394,11 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
     } else if (result is Success) {
       final data = (result as Success).data;
       print('   ✅ GetDriverDashboard Success');
-      print('   Data keys: ${data.keys}');
-      
       emit(state.copyWith(
         dashboardData: data,
         isLoading: false,
         errorMessage: null,
+        lastDashboardFetchTime: DateTime.now(),
       ));
     }
   }
@@ -491,8 +512,19 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
         isLoading: false,
         errorMessage: null,
       ));
-      // Refresh dashboard to show updated status
-      add(const GetDriverDashboardEvent());
+      add(const GetDriverDashboardEvent(forceRefresh: true));
+    }
+  }
+
+  Future<void> _onStopLocationSharing(
+    StopLocationSharingEvent event,
+    Emitter<DriverState> emit,
+  ) async {
+    final result = await stopLocationSharing(busId: event.busId);
+    if (result is Error) {
+      emit(state.copyWith(
+        errorMessage: ErrorMessageSanitizer.sanitize(result.failure),
+      ));
     }
   }
 
@@ -572,8 +604,7 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
           errorMessage: null,
         ));
       }
-      // Refresh dashboard to show new bus assignment
-      add(const GetDriverDashboardEvent());
+      add(const GetDriverDashboardEvent(forceRefresh: true));
       add(const GetPendingRequestsEvent());
     }
   }
@@ -625,6 +656,58 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
       }
       // Refresh pending requests
       add(const GetPendingRequestsEvent());
+    }
+  }
+
+  Future<void> _onGetOwnerInvitations(
+    GetOwnerInvitationsEvent event,
+    Emitter<DriverState> emit,
+  ) async {
+    final result = await getOwnerInvitations();
+    if (result is Error) {
+      emit(state.copyWith(
+        errorMessage: ErrorMessageSanitizer.sanitize((result as Error).failure),
+      ));
+    } else if (result is Success) {
+      emit(state.copyWith(
+        errorMessage: null,
+        ownerInvitations: (result as Success).data,
+      ));
+    }
+  }
+
+  Future<void> _onAcceptOwnerInvitation(
+    AcceptOwnerInvitationEvent event,
+    Emitter<DriverState> emit,
+  ) async {
+    emit(state.copyWith(isLoading: true, errorMessage: null));
+    final result = await acceptOwnerInvitation(event.invitationId);
+    if (result is Error) {
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: ErrorMessageSanitizer.sanitize((result as Error).failure),
+      ));
+    } else {
+      emit(state.copyWith(isLoading: false, errorMessage: null));
+      add(const GetOwnerInvitationsEvent());
+      add(const GetDriverDashboardEvent(forceRefresh: true));
+    }
+  }
+
+  Future<void> _onRejectOwnerInvitation(
+    RejectOwnerInvitationEvent event,
+    Emitter<DriverState> emit,
+  ) async {
+    emit(state.copyWith(isLoading: true, errorMessage: null));
+    final result = await rejectOwnerInvitation(event.invitationId);
+    if (result is Error) {
+      emit(state.copyWith(
+        isLoading: false,
+        errorMessage: ErrorMessageSanitizer.sanitize((result as Error).failure),
+      ));
+    } else {
+      emit(state.copyWith(isLoading: false, errorMessage: null));
+      add(const GetOwnerInvitationsEvent());
     }
   }
 
@@ -783,8 +866,7 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
         isLoading: false,
         errorMessage: null,
       ));
-      // Refresh dashboard after booking
-      add(const GetDriverDashboardEvent());
+      add(const GetDriverDashboardEvent(forceRefresh: true));
       // Note: Success message should be shown in UI via BlocListener
     }
   }
@@ -810,8 +892,7 @@ class DriverBloc extends Bloc<DriverEvent, DriverState> {
         isLoading: false,
         errorMessage: null,
       ));
-      // Refresh dashboard to get updated permissions
-      add(const GetDriverDashboardEvent());
+      add(const GetDriverDashboardEvent(forceRefresh: true));
     }
   }
 

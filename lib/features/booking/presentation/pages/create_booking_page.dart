@@ -21,9 +21,23 @@ import '../../../dashboard/presentation/bloc/states/dashboard_state.dart';
 import '../../../wallet/presentation/bloc/wallet_bloc.dart';
 import '../../../wallet/presentation/bloc/events/wallet_event.dart';
 import '../../../wallet/domain/usecases/create_wallet_hold.dart';
-import '../../../wallet/domain/usecases/release_wallet_hold.dart';
 import '../../../../core/utils/result.dart';
 import '../../../../core/errors/failures.dart';
+import '../../../../core/utils/phone_normalizer.dart';
+
+/// Create Booking UI palette: readable text, clear borders, no harsh black/white.
+class _BookingUI {
+  static const Color background = Color(0xFFF1F5F9); // Slate-100
+  static const Color cardBackground = Color(0xFFFFFFFF);
+  static const Color border = Color(0xFFCBD5E1); // Slate-300
+  static const Color borderStrong = Color(0xFF94A3B8); // Slate-400
+  static const Color textPrimary = Color(0xFF1E293B); // Slate-800
+  static const Color textSecondary = Color(0xFF475569); // Slate-600
+  static const Color textTertiary = Color(0xFF64748B); // Slate-500
+  static const Color primary = Color(0xFF0F766E); // Teal-700
+  static const Color primaryContainer = Color(0xFFCCFBF1); // Teal-100
+  static const Color onPrimary = Color(0xFFFFFFFF);
+}
 
 class CreateBookingPage extends StatefulWidget {
   const CreateBookingPage({super.key});
@@ -113,9 +127,10 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
               // Refresh dashboard to update wallet balance
               context.read<DashboardBloc>().add(const GetDashboardEvent());
               
+              // Navigate to home dashboard after success
               Future.delayed(const Duration(milliseconds: 500), () {
                 if (context.mounted) {
-                  context.pop();
+                  context.go('/dashboard');
                 }
               });
             }
@@ -125,13 +140,75 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
               return const SkeletonList(itemCount: 5, itemHeight: 100);
             }
 
-            return SingleChildScrollView(
-              padding: const EdgeInsets.all(AppTheme.spacingM),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
+            final bookingTheme = Theme.of(context).copyWith(
+              colorScheme: Theme.of(context).colorScheme.copyWith(
+                primary: _BookingUI.primary,
+                onPrimary: _BookingUI.onPrimary,
+                primaryContainer: _BookingUI.primaryContainer,
+                surface: _BookingUI.cardBackground,
+                onSurface: _BookingUI.textPrimary,
+              ),
+              cardTheme: CardThemeData(
+                elevation: 0,
+                color: _BookingUI.cardBackground,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                  side: const BorderSide(color: _BookingUI.border, width: 1.5),
+                ),
+              ),
+              inputDecorationTheme: InputDecorationTheme(
+                filled: true,
+                fillColor: _BookingUI.cardBackground,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                  borderSide: const BorderSide(color: _BookingUI.border, width: 1.5),
+                ),
+                enabledBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                  borderSide: const BorderSide(color: _BookingUI.border, width: 1.5),
+                ),
+                focusedBorder: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                  borderSide: const BorderSide(color: _BookingUI.primary, width: 2),
+                ),
+                labelStyle: const TextStyle(color: _BookingUI.textSecondary),
+                hintStyle: const TextStyle(color: _BookingUI.textTertiary),
+              ),
+              elevatedButtonTheme: ElevatedButtonThemeData(
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _BookingUI.primary,
+                  foregroundColor: _BookingUI.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(AppTheme.radiusM),
+                    side: const BorderSide(color: _BookingUI.borderStrong, width: 1),
+                  ),
+                ),
+              ),
+              dividerTheme: const DividerThemeData(
+                color: _BookingUI.border,
+                thickness: 1,
+                space: 1,
+              ),
+              textTheme: Theme.of(context).textTheme.copyWith(
+                titleLarge: Theme.of(context).textTheme.titleLarge?.copyWith(color: _BookingUI.textPrimary),
+                titleMedium: Theme.of(context).textTheme.titleMedium?.copyWith(color: _BookingUI.textPrimary),
+                bodyLarge: Theme.of(context).textTheme.bodyLarge?.copyWith(color: _BookingUI.textPrimary),
+                bodyMedium: Theme.of(context).textTheme.bodyMedium?.copyWith(color: _BookingUI.textSecondary),
+                bodySmall: Theme.of(context).textTheme.bodySmall?.copyWith(color: _BookingUI.textTertiary),
+                labelLarge: Theme.of(context).textTheme.labelLarge?.copyWith(color: _BookingUI.textPrimary),
+              ),
+            );
+            return Container(
+              color: _BookingUI.background,
+              child: Theme(
+                data: bookingTheme,
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.all(AppTheme.spacingM),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                     // Step Indicator
                     StepProgressIndicator(
                       currentStep: _selectedBusId == null 
@@ -177,6 +254,7 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                           // If no access AND insufficient balance, show message
                           if (hasNoAccess && !hasSufficientBalance) {
                             return EnhancedCard(
+                              border: Border.all(color: _BookingUI.border, width: 1.5),
                               child: Container(
                                 padding: const EdgeInsets.all(AppTheme.spacingL),
                                 child: Column(
@@ -199,7 +277,7 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                                       'You do not have access to this bus. Add money to your wallet (Rs. ${NumberFormat('#,##0.00').format(estimatedPrice)} minimum) to book seats.',
                                       textAlign: TextAlign.center,
                                       style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                            color: AppTheme.textPrimary,
+                                            color: _BookingUI.textPrimary,
                                           ),
                                     ),
                                     const SizedBox(height: AppTheme.spacingM),
@@ -219,6 +297,7 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                             return _SeatSelectionSection(
                               bus: state.selectedBus!,
                               selectedSeats: _selectedSeats,
+                              walletGrantsAccess: hasSufficientBalance && hasNoAccess,
                               onSeatsChanged: (seats) {
                                 setState(() {
                                   _selectedSeats = seats;
@@ -336,6 +415,8 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                   ],
                 ),
               ),
+            ),
+              ),
             );
           },
         ),
@@ -413,9 +494,16 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
       final dashboard = dashboardState.dashboard;
       final walletBalance = dashboard?.counter.walletBalance ?? 0.0;
       final totalPrice = selectedBus.price * _selectedSeats.length;
+
+      // DEBUG: why wallet/topup messages may appear
+      debugPrint('[CreateBooking] _submitBooking selectedBus: id=${selectedBus.id} name=${selectedBus.name}');
+      debugPrint('[CreateBooking]   requiresWallet=${selectedBus.requiresWallet} hasAccess=${selectedBus.hasAccess} hasNoAccess=${selectedBus.hasNoAccess}');
+      debugPrint('[CreateBooking]   walletBalance=$walletBalance totalPrice=$totalPrice (${_selectedSeats.length} seats x ${selectedBus.price})');
+      debugPrint('[CreateBooking]   noAccessAndInsufficient=${(selectedBus.hasNoAccess == true || selectedBus.hasAccess == false) && walletBalance < totalPrice}');
       
       // If user has no access AND insufficient wallet balance, show dialog
       if ((selectedBus.hasNoAccess == true || selectedBus.hasAccess == false) && walletBalance < totalPrice) {
+        debugPrint('[CreateBooking] BLOCKING: No access + insufficient balance -> showing "add money to wallet or request access"');
         ScaffoldMessenger.of(context).showSnackBar(
           ErrorSnackBar(
             message: 'You do not have access to this bus. Please add money to wallet or request access.',
@@ -613,8 +701,10 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
         }
       }
 
-      // Check if bus requires wallet and redirect if needed
-      if (selectedBus.requiresWallet == true) {
+      // Check if bus requires wallet AND balance is insufficient — only then block and ask to top up
+      debugPrint('[CreateBooking] requiresWallet check: selectedBus.requiresWallet=${selectedBus.requiresWallet} walletBalance=$walletBalance totalPrice=$totalPrice');
+      if (selectedBus.requiresWallet == true && walletBalance < totalPrice) {
+        debugPrint('[CreateBooking] BLOCKING: requiresWallet==true and insufficient balance -> showing "Wallet Required / please add money"');
         ScaffoldMessenger.of(context).showSnackBar(
           ErrorSnackBar(
             message: 'This bus requires wallet balance. Please add money to your wallet first.',
@@ -659,8 +749,9 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
       final totalPrice = selectedBus != null 
           ? selectedBus.price * _selectedSeats.length 
           : 0.0;
-      
+      debugPrint('[CreateBooking] balance check: walletBalance=$walletBalance totalPrice=$totalPrice insufficient=${walletBalance < totalPrice}');
       if (walletBalance < totalPrice) {
+        debugPrint('[CreateBooking] BLOCKING: Insufficient balance -> showing "Insufficient Wallet Balance / please add Rs.X"');
         final shortage = totalPrice - walletBalance;
         ScaffoldMessenger.of(context).showSnackBar(
           ErrorSnackBar(
@@ -699,7 +790,8 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
       }
     }
 
-    // Two-Step Hold Flow: Create hold first, then create booking
+    // Two-Step Hold Flow (per backend API): create hold → create booking with holdId.
+    // When holdId is valid, backend skips counter bus access check ("wallet balance = can book").
     await _createBookingWithHold(context, state, selectedBus);
   }
 
@@ -710,6 +802,7 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
   ) async {
     if (selectedBus == null) return;
 
+    // Must match backend: |hold.amount - totalPrice| <= 0.01
     final totalPrice = selectedBus.price * _selectedSeats.length;
     final busName = selectedBus.name;
     final seatsStr = _selectedSeats.map((s) => s.toString()).join(', ');
@@ -787,13 +880,26 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
       final holdId = hold.holdId;
 
       if (mounted) {
-        // Create booking with holdId
+        // Normalize and validate contact number
+        final rawContact = _contactNumberController.text.trim();
+        final normalizedContact = PhoneNormalizer.normalizeNepalPhone(rawContact);
+        if (!PhoneNormalizer.isValidNormalizedNepalMobile(normalizedContact)) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            ErrorSnackBar(
+              message: 'Please enter a valid 10-digit Nepal mobile number (98XXXXXXXX).',
+              errorSource: 'Booking',
+            ),
+          );
+          return;
+        }
+
+        // Create booking with holdId (backend skips access check when holdId is valid)
         context.read<BookingBloc>().add(
           CreateBookingEvent(
             busId: _selectedBusId!,
             seatNumbers: _selectedSeats,
             passengerName: _passengerNameController.text.trim(),
-            contactNumber: _contactNumberController.text.trim(),
+            contactNumber: normalizedContact,
             passengerEmail: _passengerEmailController.text.trim().isEmpty
                 ? null
                 : _passengerEmailController.text.trim(),
@@ -807,8 +913,9 @@ class _CreateBookingPageState extends State<CreateBookingPage> {
                 ? null
                 : _luggageController.text.trim(),
             bagCount: _bagCount > 0 ? _bagCount : null,
-            paymentMethod: _selectedPaymentMethod,
-            holdId: holdId, // Pass holdId to booking
+            // When paying via hold, backend expects paymentMethod: 'wallet'
+            paymentMethod: 'wallet',
+            holdId: holdId,
           ),
         );
       }
@@ -978,14 +1085,17 @@ class _BusCard extends StatelessWidget {
     final hasNoAccess = bus.hasNoAccess == true || bus.hasAccess == false;
     final noSeats = bus.availableSeats == 0;
     final opacity = isDisabled ? 0.5 : 1.0;
+    final surface = theme.colorScheme.surface;
+    final disabledBg = theme.colorScheme.onSurface.withOpacity(0.06);
+    final disabledFg = theme.colorScheme.onSurface.withOpacity(0.5);
 
     return Opacity(
       opacity: opacity,
       child: Card(
         margin: const EdgeInsets.only(bottom: 12),
         color: isSelected
-            ? Theme.of(context).colorScheme.primaryContainer
-            : (isDisabled ? AppTheme.surfaceColor : null),
+            ? theme.colorScheme.primaryContainer
+            : (isDisabled ? disabledBg : surface),
         child: InkWell(
           onTap: isDisabled ? null : onTap,
           borderRadius: BorderRadius.circular(12),
@@ -997,19 +1107,21 @@ class _BusCard extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: isSelected
-                        ? Theme.of(context).colorScheme.primary
-                        : (isDisabled 
-                            ? AppTheme.textTertiary.withOpacity(0.2)
-                            : Theme.of(context).colorScheme.primaryContainer),
+                        ? theme.colorScheme.primary
+                        : (isDisabled
+                            ? disabledFg.withOpacity(0.3)
+                            : theme.colorScheme.primaryContainer),
                     borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isSelected ? theme.colorScheme.primary : _BookingUI.border,
+                      width: isSelected ? 0 : 1,
+                    ),
                   ),
                   child: Icon(
                     Icons.directions_bus,
                     color: isSelected
-                        ? Colors.white
-                        : (isDisabled 
-                            ? AppTheme.textTertiary
-                            : Theme.of(context).colorScheme.primary),
+                        ? theme.colorScheme.onPrimary
+                        : (isDisabled ? disabledFg : theme.colorScheme.primary),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -1025,10 +1137,10 @@ class _BusCard extends StatelessWidget {
                               style: theme.textTheme.titleMedium?.copyWith(
                                     fontWeight: FontWeight.bold,
                                     color: isSelected
-                                        ? Colors.white
-                                        : (isDisabled 
-                                            ? AppTheme.textTertiary
-                                            : theme.textTheme.titleMedium?.color),
+                                        ? theme.colorScheme.onPrimary
+                                        : (isDisabled
+                                            ? disabledFg
+                                            : theme.colorScheme.onSurface),
                                   ),
                             ),
                           ),
@@ -1072,9 +1184,9 @@ class _BusCard extends StatelessWidget {
                           Icon(
                             Icons.route,
                             size: 14,
-                            color: isSelected 
-                                ? Colors.white70 
-                                : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                            color: isSelected
+                                ? theme.colorScheme.onPrimary.withOpacity(0.9)
+                                : (isDisabled ? disabledFg : theme.colorScheme.onSurface.withOpacity(0.8)),
                           ),
                           const SizedBox(width: 4),
                           Expanded(
@@ -1082,8 +1194,8 @@ class _BusCard extends StatelessWidget {
                               '${bus.from} → ${bus.to}',
                               style: theme.textTheme.bodyMedium?.copyWith(
                                 color: isSelected
-                                    ? Colors.white70
-                                    : (isDisabled ? AppTheme.textTertiary : theme.textTheme.bodyMedium?.color),
+                                    ? theme.colorScheme.onPrimary.withOpacity(0.9)
+                                    : (isDisabled ? disabledFg : theme.colorScheme.onSurface),
                               ),
                               overflow: TextOverflow.ellipsis,
                             ),
@@ -1101,17 +1213,17 @@ class _BusCard extends StatelessWidget {
                               Icon(
                                 Icons.access_time,
                                 size: 14,
-                                color: isSelected 
-                                    ? Colors.white70 
-                                    : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                                color: isSelected
+                                    ? theme.colorScheme.onPrimary.withOpacity(0.9)
+                                    : (isDisabled ? disabledFg : theme.colorScheme.onSurface.withOpacity(0.7)),
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 _formatTime(bus.time),
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                      color: isSelected 
-                                          ? Colors.white70 
-                                          : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                                      color: isSelected
+                                          ? theme.colorScheme.onPrimary.withOpacity(0.9)
+                                          : (isDisabled ? disabledFg : theme.colorScheme.onSurface.withOpacity(0.7)),
                                     ),
                               ),
                               if (bus.arrival != null) ...[
@@ -1119,9 +1231,9 @@ class _BusCard extends StatelessWidget {
                                 Text(
                                   '→ ${_formatTime(bus.arrival!)}',
                                   style: theme.textTheme.bodySmall?.copyWith(
-                                        color: isSelected 
-                                            ? Colors.white70 
-                                            : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                                        color: isSelected
+                                            ? theme.colorScheme.onPrimary.withOpacity(0.9)
+                                            : (isDisabled ? disabledFg : theme.colorScheme.onSurface.withOpacity(0.7)),
                                       ),
                                 ),
                               ],
@@ -1133,17 +1245,17 @@ class _BusCard extends StatelessWidget {
                               Icon(
                                 Icons.event,
                                 size: 14,
-                                color: isSelected 
-                                    ? Colors.white70 
-                                    : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                                color: isSelected
+                                    ? theme.colorScheme.onPrimary.withOpacity(0.9)
+                                    : (isDisabled ? disabledFg : theme.colorScheme.onSurface.withOpacity(0.7)),
                               ),
                               const SizedBox(width: 4),
                               Text(
                                 DateFormat('MMM d').format(bus.date),
                                 style: theme.textTheme.bodySmall?.copyWith(
-                                      color: isSelected 
-                                          ? Colors.white70 
-                                          : (isDisabled ? AppTheme.textTertiary : AppTheme.textSecondary),
+                                      color: isSelected
+                                          ? theme.colorScheme.onPrimary.withOpacity(0.9)
+                                          : (isDisabled ? disabledFg : theme.colorScheme.onSurface.withOpacity(0.7)),
                                     ),
                               ),
                             ],
@@ -1161,8 +1273,8 @@ class _BusCard extends StatelessWidget {
                       style: theme.textTheme.titleMedium?.copyWith(
                             fontWeight: FontWeight.bold,
                             color: isSelected
-                                ? Colors.white
-                                : (isDisabled ? AppTheme.textTertiary : theme.colorScheme.primary),
+                                ? theme.colorScheme.onPrimary
+                                : (isDisabled ? disabledFg : theme.colorScheme.primary),
                           ),
                     ),
                     const SizedBox(height: 4),
@@ -1191,7 +1303,7 @@ class _BusCard extends StatelessWidget {
                   const SizedBox(width: 8),
                   Icon(
                     Icons.check_circle,
-                    color: Theme.of(context).colorScheme.primary,
+                    color: theme.colorScheme.primary,
                   ),
                 ] else if (isDisabled) ...[
                   const SizedBox(width: 8),
@@ -1213,6 +1325,7 @@ class _BusCard extends StatelessWidget {
 class _SeatSelectionSection extends StatelessWidget {
   final BusInfoEntity bus;
   final List<dynamic> selectedSeats; // Supports both int and String
+  final bool walletGrantsAccess; // True when user has no counter access but sufficient balance to book
   final Function(List<dynamic>) onSeatsChanged;
   final Function(List<dynamic>) onLockSeats;
   final Function(List<dynamic>) onUnlockSeats;
@@ -1220,6 +1333,7 @@ class _SeatSelectionSection extends StatelessWidget {
   const _SeatSelectionSection({
     required this.bus,
     required this.selectedSeats,
+    this.walletGrantsAccess = false,
     required this.onSeatsChanged,
     required this.onLockSeats,
     required this.onUnlockSeats,
@@ -1262,6 +1376,7 @@ class _SeatSelectionSection extends StatelessWidget {
     
     return EnhancedCard(
       padding: const EdgeInsets.all(AppTheme.spacingL),
+      border: Border.all(color: _BookingUI.border, width: 1.5),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1270,12 +1385,13 @@ class _SeatSelectionSection extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(AppTheme.spacingS),
                 decoration: BoxDecoration(
-                  color: AppTheme.primaryColor.withOpacity(0.1),
+                  color: _BookingUI.primary.withOpacity(0.15),
                   borderRadius: BorderRadius.circular(AppTheme.radiusS),
+                  border: Border.all(color: _BookingUI.border, width: 1),
                 ),
                 child: Icon(
                   Icons.event_seat_rounded,
-                  color: AppTheme.primaryColor,
+                  color: _BookingUI.primary,
                   size: 24,
                 ),
               ),
@@ -1284,7 +1400,7 @@ class _SeatSelectionSection extends StatelessWidget {
                 'Select Seats',
                 style: Theme.of(context).textTheme.titleLarge?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: AppTheme.textPrimary,
+                      color: _BookingUI.textPrimary,
                     ),
               ),
             ],
@@ -1399,6 +1515,7 @@ class _SeatSelectionSection extends StatelessWidget {
             bookedSeats: bookedSeats,
             lockedSeats: lockedSeats,
             selectedSeats: selectedSeats,
+            walletGrantsAccess: walletGrantsAccess,
             onSeatTapped: (seatIdentifier) {
               final newSeats = List<dynamic>.from(selectedSeats);
               // Use proper comparison for both int and String
@@ -1581,8 +1698,9 @@ List<Widget> _buildDeckerSeatColumn(
   BusInfoEntity bus,
   double Function(dynamic) getSeatPrice, // Function to get price per seat
   bool Function(dynamic, List<dynamic>) isSeatInList,
-  void Function(dynamic) onSeatTapped,
-) {
+  void Function(dynamic) onSeatTapped, {
+  bool walletGrantsAccess = false,
+}) {
   final widgets = <Widget>[];
   
   // Arrange seats in pairs (2 seats per row)
@@ -1596,7 +1714,7 @@ List<Widget> _buildDeckerSeatColumn(
           final isBooked = isSeatInList(seatId, bookedSeats);
           final isLocked = isSeatInList(seatId, lockedSeats);
           final isSelected = isSeatInList(seatId, selectedSeats);
-          final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked);
+          final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked, walletGrantsAccess: walletGrantsAccess);
           return Expanded(
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 2, vertical: 4),
@@ -1619,9 +1737,10 @@ List<Widget> _buildDeckerSeatColumn(
   return widgets;
 }
 
-bool _seatSelectable(BusInfoEntity bus, dynamic seatId, bool isBooked, bool isLocked) {
+bool _seatSelectable(BusInfoEntity bus, dynamic seatId, bool isBooked, bool isLocked, {bool walletGrantsAccess = false}) {
   if (isBooked || isLocked) return false;
-  if (bus.hasNoAccess == true) return false;
+  // Allow selection when user has no counter access but sufficient wallet balance
+  if (bus.hasNoAccess == true || bus.hasAccess == false) return walletGrantsAccess;
   if (bus.hasRestrictedAccess == true && bus.availableAllowedSeats != null && bus.availableAllowedSeats!.isNotEmpty) {
     final seatNum = seatId is int ? seatId : (seatId is String && int.tryParse(seatId) != null ? int.parse(seatId) : null);
     if (seatNum != null) return bus.availableAllowedSeats!.contains(seatNum);
@@ -1643,6 +1762,7 @@ class _SeatMap extends StatelessWidget {
   final List<dynamic> bookedSeats; // Supports both int and String
   final List<dynamic> lockedSeats; // Supports both int and String
   final List<dynamic> selectedSeats; // Supports both int and String
+  final bool walletGrantsAccess; // True when user can book via wallet even without counter access
   final Function(dynamic) onSeatTapped; // Accepts both int and String
   const _SeatMap({
     required this.bus,
@@ -1651,6 +1771,7 @@ class _SeatMap extends StatelessWidget {
     required this.bookedSeats,
     required this.lockedSeats,
     required this.selectedSeats,
+    this.walletGrantsAccess = false,
     required this.onSeatTapped,
   });
   
@@ -1666,27 +1787,42 @@ class _SeatMap extends StatelessWidget {
     bool Function(dynamic, List<dynamic>) isSeatInList,
     void Function(dynamic) onSeatTapped,
   ) {
-    // Separate special seats (cabin) from standard A/B seats
-    final cabinSeats = <dynamic>[];
-    final standardASeats = <dynamic>[];
-    final standardBSeats = <dynamic>[];
-    final tailSeats = <dynamic>[];
+    // Separate seats by deck: Lower Decker and Upper Decker
+    final lowerDeckerCabinSeats = <dynamic>[];
+    final lowerDeckerASeats = <dynamic>[];
+    final lowerDeckerBSeats = <dynamic>[];
+    final lowerDeckerTailSeats = <dynamic>[];
+    final upperDeckerSeats = <dynamic>[];
     
     for (final id in seatIdentifiers) {
       final s = id.toString().trim().toUpperCase();
-      if (s == 'SP1' || s == 'J1' || s == 'J2' || 
+      
+      // Check for Upper Decker seats (typically U1, U2, U3, etc. or seats 16+)
+      if (s.startsWith('U') && RegExp(r'^U\d+$').hasMatch(s)) {
+        upperDeckerSeats.add(id);
+      } else if (s == 'SP1' || s == 'J1' || s == 'J2' || 
           s == 'AKC' || s == 'AKHA' || s == 'AGG' || s == 'AGHA' ||
           s == 'BKC' || s == 'KHA' || s == 'BGC' || s == 'BGHA') {
-        cabinSeats.add(id);
+        // Special cabin seats (Lower Decker)
+        lowerDeckerCabinSeats.add(id);
       } else if (s.startsWith('A') && RegExp(r'^A\d+$').hasMatch(s)) {
-        standardASeats.add(id);
+        // Lower Decker A series
+        lowerDeckerASeats.add(id);
       } else if (s.startsWith('B') && RegExp(r'^B\d+$').hasMatch(s)) {
-        standardBSeats.add(id);
+        // Lower Decker B series
+        lowerDeckerBSeats.add(id);
       } else if (s == '15') {
-        tailSeats.add(id);
+        // Tail seat (Lower Decker middle seat)
+        lowerDeckerTailSeats.add(id);
       } else {
-        // Other non-standard seats go to cabin
-        cabinSeats.add(id);
+        // Other non-standard seats - check if numeric and > 15 for upper decker
+        final numSeat = int.tryParse(s);
+        if (numSeat != null && numSeat > 15) {
+          upperDeckerSeats.add(id);
+        } else {
+          // Default to Lower Decker cabin
+          lowerDeckerCabinSeats.add(id);
+        }
       }
     }
     
@@ -1696,8 +1832,9 @@ class _SeatMap extends StatelessWidget {
       final match = RegExp(r'\d+').firstMatch(s);
       return match != null ? int.tryParse(match.group(0) ?? '0') ?? 0 : 0;
     }
-    standardASeats.sort((a, b) => sortKey(a).compareTo(sortKey(b)));
-    standardBSeats.sort((a, b) => sortKey(a).compareTo(sortKey(b)));
+    lowerDeckerASeats.sort((a, b) => sortKey(a).compareTo(sortKey(b)));
+    lowerDeckerBSeats.sort((a, b) => sortKey(a).compareTo(sortKey(b)));
+    upperDeckerSeats.sort((a, b) => sortKey(a).compareTo(sortKey(b)));
     
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1714,16 +1851,16 @@ class _SeatMap extends StatelessWidget {
           ),
         ),
         // Build cabin row (special seats at top)
-        if (cabinSeats.isNotEmpty) ...[
+        if (lowerDeckerCabinSeats.isNotEmpty) ...[
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.center,
-            children: cabinSeats.map<Widget>((seatId) {
+            children: lowerDeckerCabinSeats.map<Widget>((seatId) {
               final isBooked = isSeatInList(seatId, bookedSeats);
               final isLocked = isSeatInList(seatId, lockedSeats);
               final isSelected = isSeatInList(seatId, selectedSeats);
-              final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked);
+              final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked, walletGrantsAccess: walletGrantsAccess);
               return _SeatWidget(
                 seatIdentifier: seatId,
                 seatPrice: getSeatPrice(seatId),
@@ -1745,7 +1882,7 @@ class _SeatMap extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: _buildDeckerSeatColumn(
-                  standardASeats,
+                  lowerDeckerASeats,
                   bookedSeats,
                   lockedSeats,
                   selectedSeats,
@@ -1753,6 +1890,7 @@ class _SeatMap extends StatelessWidget {
                   getSeatPrice,
                   isSeatInList,
                   onSeatTapped,
+                  walletGrantsAccess: walletGrantsAccess,
                 ),
               ),
             ),
@@ -1761,7 +1899,7 @@ class _SeatMap extends StatelessWidget {
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: _buildDeckerSeatColumn(
-                  standardBSeats,
+                  lowerDeckerBSeats,
                   bookedSeats,
                   lockedSeats,
                   selectedSeats,
@@ -1769,20 +1907,21 @@ class _SeatMap extends StatelessWidget {
                   getSeatPrice,
                   isSeatInList,
                   onSeatTapped,
+                  walletGrantsAccess: walletGrantsAccess,
                 ),
               ),
             ),
           ],
         ),
         // Tail seat "15" - single middle seat
-        if (tailSeats.isNotEmpty) ...[
+        if (lowerDeckerTailSeats.isNotEmpty) ...[
           const SizedBox(height: 12),
           Center(
-            child: tailSeats.map<Widget>((seatId) {
+            child: lowerDeckerTailSeats.map<Widget>((seatId) {
               final isBooked = isSeatInList(seatId, bookedSeats);
               final isLocked = isSeatInList(seatId, lockedSeats);
               final isSelected = isSeatInList(seatId, selectedSeats);
-              final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked);
+              final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked, walletGrantsAccess: walletGrantsAccess);
               return _SeatWidget(
                 seatIdentifier: seatId,
                 seatPrice: getSeatPrice(seatId),
@@ -1793,6 +1932,44 @@ class _SeatMap extends StatelessWidget {
                 onTap: (isBooked || isLocked || !isSelectable) ? null : () => onSeatTapped(seatId),
               );
             }).toList().first,
+          ),
+        ],
+        // Upper Decker section
+        if (upperDeckerSeats.isNotEmpty) ...[
+          const SizedBox(height: AppTheme.spacingL),
+          Padding(
+            padding: const EdgeInsets.only(top: AppTheme.spacingM, bottom: AppTheme.spacingM),
+            child: Text(
+              'Upper Decker',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.bold,
+                color: AppTheme.textPrimary,
+              ),
+            ),
+          ),
+          // Upper Decker seats arranged in grid (2 columns)
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            alignment: WrapAlignment.start,
+            children: upperDeckerSeats.map<Widget>((seatId) {
+              final isBooked = isSeatInList(seatId, bookedSeats);
+              final isLocked = isSeatInList(seatId, lockedSeats);
+              final isSelected = isSeatInList(seatId, selectedSeats);
+              final isSelectable = _seatSelectable(bus, seatId, isBooked, isLocked, walletGrantsAccess: walletGrantsAccess);
+              return SizedBox(
+                width: 80,
+                child: _SeatWidget(
+                  seatIdentifier: seatId,
+                  seatPrice: getSeatPrice(seatId),
+                  isBooked: isBooked,
+                  isLocked: isLocked,
+                  isSelected: isSelected,
+                  isNotAllowed: !isSelectable,
+                  onTap: (isBooked || isLocked || !isSelectable) ? null : () => onSeatTapped(seatId),
+                ),
+              );
+            }).toList(),
           ),
         ],
       ],
@@ -1836,8 +2013,11 @@ class _SeatMap extends StatelessWidget {
         seatIdentifiers = [];
       }
     } else if (bus.hasNoAccess == true || bus.hasAccess == false) {
-      // Counter has no access - show no seats
-      seatIdentifiers = [];
+      // Counter has no access - show no seats unless wallet balance grants access
+      if (!walletGrantsAccess) {
+        seatIdentifiers = [];
+      }
+      // If walletGrantsAccess, keep seatIdentifiers (show all seats)
     } else if (bus.hasAccess == true && bus.requiresWallet != true) {
       // Counter has access - show all seats (no filtering needed)
       // seatIdentifiers remains unchanged
@@ -2053,8 +2233,8 @@ class _SeatMap extends StatelessWidget {
                         allowed.toString() == seatIdentifier.toString()
                       );
                     }
-                  } else if (bus.hasNoAccess == true) {
-                    isSeatSelectable = false;
+                  } else if (bus.hasNoAccess == true || bus.hasAccess == false) {
+                    isSeatSelectable = walletGrantsAccess && !isBooked && !isLocked;
                   } else if (bus.hasAccess == true && bus.requiresWallet != true) {
                     // Has access - seat is selectable if not booked/locked
                     isSeatSelectable = !isBooked && !isLocked;

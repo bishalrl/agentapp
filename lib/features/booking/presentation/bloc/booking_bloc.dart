@@ -12,6 +12,7 @@ import '../../domain/usecases/cancel_multiple_bookings.dart';
 import '../../domain/usecases/update_booking_status.dart';
 import '../../domain/usecases/lock_seats.dart';
 import '../../domain/usecases/unlock_seats.dart';
+import '../../../wallet/domain/usecases/release_wallet_hold.dart';
 import 'events/booking_event.dart';
 import 'states/booking_state.dart';
 
@@ -26,6 +27,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
   final UpdateBookingStatus updateBookingStatus;
   final LockSeats lockSeats;
   final UnlockSeats unlockSeats;
+  final ReleaseWalletHold releaseWalletHold;
 
   BookingBloc({
     required this.getBuses,
@@ -38,6 +40,7 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
     required this.updateBookingStatus,
     required this.lockSeats,
     required this.unlockSeats,
+    required this.releaseWalletHold,
   }) : super(const BookingState()) {
     on<GetAvailableBusesEvent>(_onGetBuses);
     on<GetBusDetailsEvent>(_onGetBusDetails);
@@ -117,10 +120,22 @@ class BookingBloc extends Bloc<BookingEvent, BookingState> {
       final failure = (result as Error).failure;
       print('   ❌ CreateBooking Error: ${failure.message}');
       print('   Failure type: ${failure.runtimeType}');
-      
+
+      // Release wallet hold so the amount is not left held when booking fails
+      if (event.holdId != null && event.holdId!.isNotEmpty) {
+        try {
+          final releaseResult = await releaseWalletHold(holdId: event.holdId!);
+          if (releaseResult is Success) {
+            print('   🔓 Wallet hold released after booking failure: ${event.holdId}');
+          }
+        } catch (_) {
+          print('   ⚠️ Could not release wallet hold (backend may auto-release): ${event.holdId}');
+        }
+      }
+
       // Use centralized error sanitizer to prevent exposing backend errors
       final errorMessage = ErrorMessageSanitizer.sanitize(failure);
-      
+
       emit(state.copyWith(
         isLoading: false,
         errorMessage: errorMessage,

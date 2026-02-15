@@ -30,6 +30,7 @@ class Signup {
     String? whatsappViber,
     File? panFile,
     File? registrationFile,
+    required String otp,
   }) async {
     return await repository.signup(
       agencyName: agencyName,
@@ -53,6 +54,7 @@ class Signup {
       whatsappViber: whatsappViber,
       panFile: panFile,
       registrationFile: registrationFile,
+      otp: otp,
     );
   }
 }

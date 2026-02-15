@@ -252,23 +252,37 @@ class ApiClient {
     } else if (statusCode == 404) {
       throw NotFoundException('Not found');
     } else {
+      // Log raw body for debugging (so we can see what backend actually returned)
+      if (body.isNotEmpty) {
+        final bodyPreview = body.length > 600 ? '${body.substring(0, 600)}...' : body;
+        print('⚠️ Backend response body (Status $statusCode): $bodyPreview');
+      } else {
+        print('⚠️ Backend response body (Status $statusCode): (empty)');
+      }
+
       // Extract raw error message from response (for logging only)
       String rawErrorMessage = 'Server error';
       try {
         if (body.isNotEmpty) {
-          final json = jsonDecode(body) as Map<String, dynamic>;
-          // Try multiple possible error message fields
-          rawErrorMessage = json['message'] as String? ?? 
-                        json['error'] as String? ?? 
-                        json['msg'] as String? ??
-                        (json['errors'] != null ? json['errors'].toString() : null) ??
-                        'Server error';
+          final decoded = jsonDecode(body);
+          if (decoded is Map<String, dynamic>) {
+            final json = decoded;
+            rawErrorMessage = json['message'] as String? ??
+                json['error'] as String? ??
+                json['msg'] as String? ??
+                (json['errors'] != null ? json['errors'].toString() : null) ??
+                'Server error';
+          } else if (decoded is String) {
+            rawErrorMessage = decoded;
+          }
         }
       } catch (e) {
-        // If JSON parsing fails, use status code
-        rawErrorMessage = 'Server error (Status: $statusCode)';
+        // If JSON parsing fails, use body as message if it's short text
+        rawErrorMessage = body.trim().isNotEmpty && body.length < 300
+            ? body.trim()
+            : 'Server error (Status: $statusCode)';
       }
-      
+
       // Log raw error for debugging (but don't expose to users)
       print('⚠️ Raw backend error (Status $statusCode): $rawErrorMessage');
       

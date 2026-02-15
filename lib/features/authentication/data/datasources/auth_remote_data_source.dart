@@ -4,10 +4,21 @@ import '../../../../core/constants/api_constants.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/multipart_client.dart';
+import '../../../../core/utils/phone_normalizer.dart';
 import '../models/auth_model.dart';
 
 abstract class AuthRemoteDataSource {
-  Future<AuthModel> login(String email, String password);
+  Future<AuthModel> login(String phone, String password);
+  Future<void> sendOtp({
+    required String phone,
+    String purpose,
+    String userType,
+  });
+  Future<AuthModel> verifyOtpLogin({
+    required String phone,
+    required String otp,
+    String userType,
+  });
   Future<void> changePassword(String currentPassword, String newPassword, String token);
   Future<void> forgotPassword(String email);
   Future<void> resetPassword(String token, String newPassword);
@@ -33,6 +44,7 @@ abstract class AuthRemoteDataSource {
     String? whatsappViber,
     File? panFile,
     File? registrationFile,
+    required String otp,
   });
 }
 
@@ -43,15 +55,16 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
   AuthRemoteDataSourceImpl(this.apiClient, this.multipartClient);
 
   @override
-  Future<AuthModel> login(String email, String password) async {
+  Future<AuthModel> login(String phone, String password) async {
     try {
+      final normalizedPhone = PhoneNormalizer.normalizeNepalPhone(phone);
       print('📤 AuthRemoteDataSource.login: Sending request');
-      print('   Email: $email');
+      print('   Phone: $normalizedPhone');
       print('   Endpoint: ${ApiConstants.counterLogin}');
       final response = await apiClient.post(
         ApiConstants.counterLogin,
         body: {
-          'email': email,
+          'phone': normalizedPhone,
           'password': password,
         },
       );
@@ -62,7 +75,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
 
       // Check for error responses first (even if status code is 200)
       if (response['success'] == false || (response['message'] != null && response['token'] == null)) {
-        final errorMsg = response['message'] as String? ?? 'Invalid email or password';
+        final errorMsg = response['message'] as String? ?? 'Invalid phone or password';
         print('   ❌ Login failed: $errorMsg');
         print('   Response indicates failure: success=${response['success']}, message=$errorMsg');
         // Check if it's an authentication error
@@ -70,6 +83,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         if (msgLower.contains('invalid') || 
             msgLower.contains('wrong') || 
             msgLower.contains('incorrect') ||
+            msgLower.contains('phone') ||
             msgLower.contains('email') ||
             msgLower.contains('password') ||
             msgLower.contains('credential')) {
@@ -123,6 +137,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         if (msgLower.contains('invalid') || 
             msgLower.contains('wrong') || 
             msgLower.contains('incorrect') ||
+            msgLower.contains('phone') ||
             msgLower.contains('email') ||
             msgLower.contains('password') ||
             msgLower.contains('credential')) {
@@ -144,6 +159,131 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
       rethrow;
     } catch (e, stackTrace) {
       print('   ❌ AuthRemoteDataSource.login: Unexpected error');
+      print('   Error: $e');
+      print('   StackTrace: $stackTrace');
+      throw ServerException('Request failed. Please try again.');
+    }
+  }
+
+  @override
+  Future<void> sendOtp({
+    required String phone,
+    String purpose = 'login',
+    String userType = 'Counter',
+  }) async {
+    try {
+      final normalizedPhone = PhoneNormalizer.normalizeNepalPhone(phone);
+      print('📤 AuthRemoteDataSource.sendOtp: Sending OTP request');
+      print('   Raw phone: $phone');
+      print('   Normalized phone: $normalizedPhone');
+      print('   Purpose: $purpose');
+      print('   UserType: $userType');
+      print('   Endpoint: ${ApiConstants.authSendOtp}');
+
+      final response = await apiClient.post(
+        ApiConstants.authSendOtp,
+        body: {
+          'phone': normalizedPhone,
+          'purpose': purpose,
+          'userType': userType,
+        },
+      );
+
+      print('📥 AuthRemoteDataSource.sendOtp: Response received');
+      print('   Response: $response');
+
+      if (response['success'] == true) {
+        print('   ✅ OTP sent successfully');
+        return;
+      } else {
+        final message = response['message'] as String? ?? 'Failed to send OTP';
+        print('   ❌ sendOtp failed: $message');
+        throw ServerException(message);
+      }
+    } on NetworkException catch (e) {
+      print('   ❌ AuthRemoteDataSource.sendOtp: NetworkException');
+      print('   Error: ${e.message}');
+      rethrow;
+    } on ServerException {
+      rethrow;
+    } catch (e, stackTrace) {
+      print('   ❌ AuthRemoteDataSource.sendOtp: Unexpected error');
+      print('   Error: $e');
+      print('   StackTrace: $stackTrace');
+      throw ServerException('Request failed. Please try again.');
+    }
+  }
+
+  @override
+  Future<AuthModel> verifyOtpLogin({
+    required String phone,
+    required String otp,
+    String userType = 'Counter',
+  }) async {
+    try {
+      final normalizedPhone = PhoneNormalizer.normalizeNepalPhone(phone);
+      print('📤 AuthRemoteDataSource.verifyOtpLogin: Sending request');
+      print('   Raw phone: $phone');
+      print('   Normalized phone: $normalizedPhone');
+      print('   UserType: $userType');
+      print('   Endpoint: ${ApiConstants.authVerifyOtpLogin}');
+
+      final response = await apiClient.post(
+        ApiConstants.authVerifyOtpLogin,
+        body: {
+          'phone': normalizedPhone,
+          'otp': otp,
+          'userType': userType,
+        },
+      );
+
+      print('📥 AuthRemoteDataSource.verifyOtpLogin: Response received');
+      print('   Response keys: ${response.keys}');
+      print('   Response: $response');
+
+      if (response['success'] == false) {
+        final errorMsg = response['message'] as String? ?? 'Invalid OTP';
+        print('   ❌ verifyOtpLogin failed: $errorMsg');
+        final msgLower = errorMsg.toLowerCase();
+        if (msgLower.contains('invalid') || msgLower.contains('otp')) {
+          throw AuthenticationException(errorMsg);
+        }
+        throw ServerException(errorMsg);
+      }
+
+      // Expect similar format to counter login: either direct or wrapped.
+      if (response['token'] != null && response['data'] != null) {
+        print('   ✅ Parsing verifyOtpLogin response with token + data');
+        final data = response['data'] as Map<String, dynamic>;
+        final mergedData = {
+          ...data,
+          'token': response['token'],
+          'mustChangePassword': response['mustChangePassword'] ?? false,
+        };
+        return AuthModel.fromJson(mergedData);
+      }
+
+      // Fallback: if backend returns token + counter at top level
+      if (response['token'] != null &&
+          (response['agent'] != null || response['counter'] != null)) {
+        print('   ✅ Parsing verifyOtpLogin direct response format');
+        return AuthModel.fromJson(response);
+      }
+
+      final errorMsg =
+          response['message'] as String? ?? 'OTP login failed: Invalid response format';
+      print('   ❌ verifyOtpLogin failed: $errorMsg');
+      throw ServerException(errorMsg);
+    } on NetworkException catch (e) {
+      print('   ❌ AuthRemoteDataSource.verifyOtpLogin: NetworkException');
+      print('   Error: ${e.message}');
+      rethrow;
+    } on AuthenticationException {
+      rethrow;
+    } on ServerException {
+      rethrow;
+    } catch (e, stackTrace) {
+      print('   ❌ AuthRemoteDataSource.verifyOtpLogin: Unexpected error');
       print('   Error: $e');
       print('   StackTrace: $stackTrace');
       throw ServerException('Request failed. Please try again.');
@@ -280,6 +420,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
     String? whatsappViber,
     File? panFile,
     File? registrationFile,
+    required String otp,
   }) async {
     try {
       // Prepare form fields
@@ -298,6 +439,7 @@ class AuthRemoteDataSourceImpl implements AuthRemoteDataSource {
         'hasInternetAccess': hasInternetAccess.toString(),
         'preferredBookingMethod': preferredBookingMethod,
         'password': password,
+        'otp': otp,
       };
 
       // Add optional fields

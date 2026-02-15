@@ -18,6 +18,7 @@ class DriverDashboardPage extends StatelessWidget {
         final bloc = di.sl<DriverBloc>();
         bloc.add(const GetDriverDashboardEvent());
         bloc.add(const GetPendingRequestsEvent());
+        bloc.add(const GetOwnerInvitationsEvent());
         return bloc;
       },
       child: Scaffold(
@@ -34,8 +35,9 @@ class DriverDashboardPage extends StatelessWidget {
             IconButton(
               icon: const Icon(Icons.refresh),
               onPressed: () {
-                context.read<DriverBloc>().add(const GetDriverDashboardEvent());
+                context.read<DriverBloc>().add(const GetDriverDashboardEvent(forceRefresh: true));
                 context.read<DriverBloc>().add(const GetPendingRequestsEvent());
+                context.read<DriverBloc>().add(const GetOwnerInvitationsEvent());
               },
               tooltip: 'Refresh',
             ),
@@ -81,7 +83,7 @@ class DriverDashboardPage extends StatelessWidget {
                     const SizedBox(height: 16),
                     ElevatedButton(
                       onPressed: () {
-                        context.read<DriverBloc>().add(const GetDriverDashboardEvent());
+                        context.read<DriverBloc>().add(const GetDriverDashboardEvent(forceRefresh: true));
                       },
                       child: const Text('Retry'),
                     ),
@@ -110,15 +112,17 @@ class DriverDashboardPage extends StatelessWidget {
             final pendingBookings = statistics?['pendingBookings'] as int? ?? 0;
             final totalRevenue = statistics?['totalRevenue'] as num? ?? 0.0;
             
-            // Check driver status for feature restrictions
+            // Driver account status (for suspension/invite messaging only)
             final driverStatus = driver?['status'] as String?;
-            final isActive = driverStatus == 'ACTIVE';
+            final isDriverActive = driverStatus == 'ACTIVE';
             final isSuspended = driverStatus == 'SUSPENDED';
             final isInvited = driverStatus == 'INVITED';
 
             return RefreshIndicator(
               onRefresh: () async {
-                context.read<DriverBloc>().add(const GetDriverDashboardEvent());
+                context.read<DriverBloc>().add(const GetDriverDashboardEvent(forceRefresh: true));
+                context.read<DriverBloc>().add(const GetPendingRequestsEvent());
+                context.read<DriverBloc>().add(const GetOwnerInvitationsEvent());
               },
               child: SingleChildScrollView(
                 padding: const EdgeInsets.all(AppTheme.spacingM),
@@ -195,7 +199,7 @@ class DriverDashboardPage extends StatelessWidget {
                           ],
                         ),
                       ),
-                    ] else if (!isActive) ...[
+                    ] else if (!isDriverActive) ...[
                       const SizedBox(height: AppTheme.spacingM),
                       Container(
                         padding: const EdgeInsets.all(AppTheme.spacingM),
@@ -219,6 +223,50 @@ class DriverDashboardPage extends StatelessWidget {
                       ),
                     ],
                     
+                    // Owner invitations (owner join flow: already-registered driver)
+                    if (state.ownerInvitations != null) ...[
+                      Builder(
+                        builder: (context) {
+                          final invData = state.ownerInvitations!;
+                          final raw = invData['invitations'] as List<dynamic>? ?? invData['data'] as List<dynamic>? ?? [];
+                          final invitations = raw
+                              .where((e) => e is Map<String, dynamic>)
+                              .cast<Map<String, dynamic>>()
+                              .toList();
+                          final pending = invitations.where((e) => (e['status'] as String? ?? '').toUpperCase() == 'PENDING').toList();
+                          if (pending.isEmpty) return const SizedBox.shrink();
+                          return Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const SizedBox(height: AppTheme.spacingM),
+                              Text(
+                                'Owner invitations',
+                                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                              ),
+                              const SizedBox(height: AppTheme.spacingS),
+                              ...pending.map((inv) => Padding(
+                                    padding: const EdgeInsets.only(bottom: AppTheme.spacingM),
+                                    child: _OwnerInvitationCard(
+                                      invitation: inv,
+                                      onAccept: (id) {
+                                        if (id.isEmpty) return;
+                                        context.read<DriverBloc>().add(AcceptOwnerInvitationEvent(invitationId: id));
+                                      },
+                                      onReject: (id) {
+                                        if (id.isEmpty) return;
+                                        context.read<DriverBloc>().add(RejectOwnerInvitationEvent(invitationId: id));
+                                      },
+                                      isLoading: state.isLoading,
+                                    ),
+                                  )),
+                              const SizedBox(height: AppTheme.spacingL),
+                            ],
+                          );
+                        },
+                      ),
+                    ],
                     // Pending Assignment Requests Section
                     if (state.pendingRequests != null) ...[
                       Builder(
@@ -289,21 +337,25 @@ class DriverDashboardPage extends StatelessWidget {
                         ),
                       )
                     else
-                      ...buses.map((bus) => Padding(
-                            padding: const EdgeInsets.only(bottom: AppTheme.spacingM),
-                            child: _BusCard(
-                              bus: bus as Map<String, dynamic>,
-                              isActive: isActive,
-                              onMarkReached: (busId) {
-                                context.read<DriverBloc>().add(MarkBusAsReachedEvent(busId: busId));
-                              },
-                              onViewDetails: (busId) {
-                                context.read<DriverBloc>().add(GetBusDetailsEvent(busId: busId));
-                                // Navigate to bus details page
-                                context.push('/driver/bus/$busId');
-                              },
-                            ),
-                          )),
+                      ...buses.map((bus) {
+                            final busMap = bus as Map<String, dynamic>;
+                            // Bus active state: only owner/staff activate; driver deactivates via mark-reached
+                            final busIsActive = busMap['isActive'] as bool? ?? true;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: AppTheme.spacingM),
+                              child: _BusCard(
+                                bus: busMap,
+                                busIsActive: busIsActive,
+                                onMarkReached: (busId) {
+                                  context.read<DriverBloc>().add(MarkBusAsReachedEvent(busId: busId));
+                                },
+                                onViewDetails: (busId) {
+                                  context.read<DriverBloc>().add(GetBusDetailsEvent(busId: busId));
+                                  context.push('/driver/bus/$busId');
+                                },
+                              ),
+                            );
+                          }),
                   ],
                 ),
               ),
@@ -454,16 +506,125 @@ class _InfoRow extends StatelessWidget {
     }
   }
 
+/// Owner join flow: one owner invitation with Accept / Reject.
+class _OwnerInvitationCard extends StatelessWidget {
+  final Map<String, dynamic> invitation;
+  final Function(String) onAccept;
+  final Function(String) onReject;
+  final bool isLoading;
+
+  const _OwnerInvitationCard({
+    required this.invitation,
+    required this.onAccept,
+    required this.onReject,
+    this.isLoading = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final id = invitation['id'] as String? ?? invitation['_id'] as String? ?? '';
+    final owner = invitation['owner'];
+    String ownerName = 'A bus owner';
+    if (owner is Map<String, dynamic>) {
+      ownerName = owner['name'] as String? ?? owner['agencyName'] as String? ?? ownerName;
+    }
+    final expiresAt = invitation['expiresAt'] as String?;
+
+    return EnhancedCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.purple.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(Icons.person_add, color: Colors.purple.shade700, size: 24),
+              ),
+              const SizedBox(width: AppTheme.spacingM),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Join owner\'s fleet',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    Text(
+                      '$ownerName invited you to join their fleet.',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            color: Colors.grey[600],
+                          ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          if (expiresAt != null) ...[
+            const SizedBox(height: AppTheme.spacingS),
+            Text(
+              'Expires: $expiresAt',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: Colors.grey[600],
+                  ),
+            ),
+          ],
+          const SizedBox(height: AppTheme.spacingM),
+          Row(
+            children: [
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: isLoading ? null : () => onReject(id),
+                  icon: const Icon(Icons.close),
+                  label: const Text('Reject'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                  ),
+                ),
+              ),
+              const SizedBox(width: AppTheme.spacingS),
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: isLoading ? null : () => onAccept(id),
+                  icon: isLoading
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                        )
+                      : const Icon(Icons.check),
+                  label: Text(isLoading ? 'Accepting...' : 'Accept'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppTheme.primaryColor,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
 
 class _BusCard extends StatelessWidget {
   final Map<String, dynamic> bus;
-  final bool isActive;
+  /// Bus active state from backend (single source of truth: owner/staff activate; driver deactivates via mark-reached).
+  final bool busIsActive;
   final Function(String)? onMarkReached;
   final Function(String)? onViewDetails;
 
   const _BusCard({
     required this.bus,
-    this.isActive = false,
+    this.busIsActive = false,
     this.onMarkReached,
     this.onViewDetails,
   });
@@ -472,7 +633,11 @@ class _BusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final busName = bus['name'] as String? ?? 'Unknown Bus';
     final vehicleNumber = bus['vehicleNumber'] as String? ?? 'N/A';
-    
+
+    // Bus active/inactive badge (single source of truth from backend)
+    final activeColor = busIsActive ? AppTheme.successColor : AppTheme.errorColor;
+    final activeLabel = busIsActive ? 'ACTIVE' : 'INACTIVE';
+
     // Try multiple ways to get route information (aligned with backend fix)
     final route = bus['route'] as Map<String, dynamic>?;
     String routeDisplay = 'N/A';
@@ -562,6 +727,33 @@ class _BusCard extends StatelessWidget {
                             style: Theme.of(context).textTheme.titleLarge?.copyWith(
                                   fontWeight: FontWeight.bold,
                                 ),
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: activeColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: activeColor.withOpacity(0.3)),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                busIsActive ? Icons.check_circle : Icons.cancel,
+                                size: 14,
+                                color: activeColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                activeLabel,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: activeColor,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                         if (onViewDetails != null)
@@ -658,8 +850,8 @@ class _BusCard extends StatelessWidget {
             ),
           ],
           
-          // Mark as Reached Button (if active)
-          if (isActive && onMarkReached != null) ...[
+          // Mark as Reached: only when bus is active (driver deactivates bus via this action)
+          if (busIsActive && onMarkReached != null) ...[
             const Divider(height: AppTheme.spacingL),
             SizedBox(
               width: double.infinity,

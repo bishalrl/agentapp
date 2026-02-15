@@ -48,13 +48,14 @@ class _SignupPageViewState extends State<_SignupPageView> {
   final whatsappViberController = TextEditingController();
   final passwordController = TextEditingController();
   final confirmPasswordController = TextEditingController();
+  final otpController = TextEditingController();
   
   File? citizenshipFile;
   File? photoFile;
   File? panFile;
   File? registrationFile;
-  bool hasDeviceAccess = false;
-  bool hasInternetAccess = false;
+  bool hasDeviceAccess = true;
+  bool hasInternetAccess = true;
   String preferredBookingMethod = 'online';
 
   @override
@@ -74,6 +75,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
     whatsappViberController.dispose();
     passwordController.dispose();
     confirmPasswordController.dispose();
+    otpController.dispose();
     super.dispose();
   }
 
@@ -241,6 +243,59 @@ class _SignupPageViewState extends State<_SignupPageView> {
                         icon: Icons.phone,
                         keyboardType: TextInputType.phone,
                         validator: (v) => v?.isEmpty ?? true ? 'Required' : null,
+                      ),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: _buildTextField(
+                              controller: otpController,
+                              label: 'OTP *',
+                              icon: Icons.password,
+                              keyboardType: TextInputType.number,
+                              validator: (v) {
+                                if (v == null || v.isEmpty) return 'Required';
+                                if (v.length < 4) return 'Enter valid OTP';
+                                return null;
+                              },
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          ElevatedButton(
+                            onPressed: state.isOtpSending
+                                ? null
+                                : () {
+                                    final phone = primaryContactController.text.trim();
+                                    if (phone.isEmpty || phone.length < 10) {
+                                      ScaffoldMessenger.of(context).showSnackBar(
+                                        const SnackBar(
+                                          content: Text('Enter a valid primary contact number before requesting OTP'),
+                                          backgroundColor: AppTheme.errorColor,
+                                        ),
+                                      );
+                                      return;
+                                    }
+                                    context.read<SignupBloc>().add(
+                                          SignupSendOtpEvent(phone: phone),
+                                        );
+                                  },
+                            style: ElevatedButton.styleFrom(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                            ),
+                            child: state.isOtpSending
+                                ? const SizedBox(
+                                    width: 18,
+                                    height: 18,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                                    ),
+                                  )
+                                : Text(
+                                    state.isOtpSent ? 'Resend OTP' : 'Send OTP',
+                                  ),
+                          ),
+                        ],
                       ),
                       const SizedBox(height: 12),
                       _buildTextField(
@@ -550,6 +605,7 @@ class _SignupPageViewState extends State<_SignupPageView> {
                                             : whatsappViberController.text.trim(),
                                         panFile: panFile,
                                         registrationFile: registrationFile,
+                                        otp: otpController.text.trim(),
                                       ),
                                     );
                               } else {
@@ -699,11 +755,11 @@ class _SignupPageViewState extends State<_SignupPageView> {
         prefixIcon: Icon(icon, color: Theme.of(context).colorScheme.primary),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: AppTheme.lightBorderColor!),
+          borderSide: BorderSide(color: AppTheme.lightBorderColor),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),
-          borderSide: BorderSide(color: AppTheme.lightBorderColor!),
+          borderSide: BorderSide(color: AppTheme.lightBorderColor),
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(16),

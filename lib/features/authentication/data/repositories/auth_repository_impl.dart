@@ -43,6 +43,7 @@ class AuthRepositoryImpl implements AuthRepository {
     String? whatsappViber,
     File? panFile,
     File? registrationFile,
+    required String otp,
   }) async {
     try {
       if (await networkInfo.isConnected) {
@@ -64,6 +65,7 @@ class AuthRepositoryImpl implements AuthRepository {
             hasInternetAccess: hasInternetAccess,
             preferredBookingMethod: preferredBookingMethod,
             password: password,
+            otp: otp,
             citizenshipFile: citizenshipFile,
             photoFile: photoFile,
             panVatNumber: panVatNumber,
@@ -100,14 +102,14 @@ class AuthRepositoryImpl implements AuthRepository {
   }
 
   @override
-  Future<Result<AuthEntity>> login(String email, String password) async {
+  Future<Result<AuthEntity>> login(String phone, String password) async {
     try {
       print('📦 AuthRepositoryImpl.login: Starting login process');
-      print('   Email: $email');
+      print('   Phone: $phone');
       if (await networkInfo.isConnected) {
         print('   ✅ Network connected, calling remoteDataSource');
         try {
-          final auth = await remoteDataSource.login(email, password);
+          final auth = await remoteDataSource.login(phone, password);
           print('   ✅ AuthRepositoryImpl.login: Remote login successful');
           print('   Token length: ${auth.token.length}');
           await localDataSource.saveToken(auth.token);
@@ -136,6 +138,98 @@ class AuthRepositoryImpl implements AuthRepository {
       print('   ❌ AuthRepositoryImpl.login: Unexpected error');
       print('   Error: $e');
       print('   StackTrace: $stackTrace');
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
+    }
+  }
+
+  @override
+  Future<Result<void>> sendOtp({
+    required String phone,
+    String purpose = 'login',
+    String userType = 'Counter',
+  }) async {
+    try {
+      if (!(await networkInfo.isConnected)) {
+        return const Error(NetworkFailure('No internet connection'));
+      }
+
+      try {
+        print('📦 AuthRepositoryImpl.sendOtp: Calling remoteDataSource');
+        await remoteDataSource.sendOtp(
+          phone: phone,
+          purpose: purpose,
+          userType: userType,
+        );
+        print('   ✅ AuthRepositoryImpl.sendOtp: Success');
+        return const Success(null);
+      } on NetworkException catch (e) {
+        print('   ❌ AuthRepositoryImpl.sendOtp: NetworkException');
+        print('   Error: ${e.message}');
+        return Error(NetworkFailure(e.message));
+      } on AuthenticationException catch (e) {
+        print('   ❌ AuthRepositoryImpl.sendOtp: AuthenticationException');
+        print('   Error: ${e.message}');
+        return Error(AuthenticationFailure(e.message));
+      } on ServerException catch (e) {
+        print('   ❌ AuthRepositoryImpl.sendOtp: ServerException');
+        print('   Error: ${e.message}');
+        final failure = ServerFailure(
+          ErrorMessageSanitizer.sanitizeRawServerMessage(
+            e.message.isEmpty ? 'Failed to send OTP' : e.message,
+          ),
+        );
+        return Error(failure);
+      }
+    } catch (e) {
+      print('   ❌ AuthRepositoryImpl.sendOtp: Unexpected error: $e');
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
+    }
+  }
+
+  @override
+  Future<Result<AuthEntity>> verifyOtpLogin({
+    required String phone,
+    required String otp,
+    String userType = 'Counter',
+  }) async {
+    try {
+      if (!(await networkInfo.isConnected)) {
+        return const Error(NetworkFailure('No internet connection'));
+      }
+
+      try {
+        print('📦 AuthRepositoryImpl.verifyOtpLogin: Calling remoteDataSource');
+        final auth = await remoteDataSource.verifyOtpLogin(
+          phone: phone,
+          otp: otp,
+          userType: userType,
+        );
+        print('   ✅ AuthRepositoryImpl.verifyOtpLogin: Remote call successful');
+        print('   Token length: ${auth.token.length}');
+        await localDataSource.saveToken(auth.token);
+        await localDataSource.saveSessionType('counter');
+        print('   ✅ Token & session type (counter) saved to local storage');
+        return Success(auth);
+      } on NetworkException catch (e) {
+        print('   ❌ AuthRepositoryImpl.verifyOtpLogin: NetworkException');
+        print('   Error: ${e.message}');
+        return Error(NetworkFailure(e.message));
+      } on AuthenticationException catch (e) {
+        print('   ❌ AuthRepositoryImpl.verifyOtpLogin: AuthenticationException');
+        print('   Error: ${e.message}');
+        return Error(AuthenticationFailure(e.message));
+      } on ServerException catch (e) {
+        print('   ❌ AuthRepositoryImpl.verifyOtpLogin: ServerException');
+        print('   Error: ${e.message}');
+        final failure = ServerFailure(
+          ErrorMessageSanitizer.sanitizeRawServerMessage(
+            e.message.isEmpty ? 'OTP verification failed' : e.message,
+          ),
+        );
+        return Error(failure);
+      }
+    } catch (e) {
+      print('   ❌ AuthRepositoryImpl.verifyOtpLogin: Unexpected error: $e');
       return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }

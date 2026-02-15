@@ -475,7 +475,7 @@ class DriverRepositoryImpl implements DriverRepository {
   }
   
   @override
-  Future<Result<void>> stopLocationSharing() async {
+  Future<Result<void>> stopLocationSharing({String? busId}) async {
     final tokenResult = await getStoredToken();
     String? token;
     if (tokenResult is Error<String?>) {
@@ -489,7 +489,7 @@ class DriverRepositoryImpl implements DriverRepository {
     }
     
     try {
-      await remoteDataSource.stopLocationSharing(token);
+      await remoteDataSource.stopLocationSharing(token, busId: busId);
       return const Success(null);
     } on AuthenticationException catch (e) {
       if (!SessionManager().isLoggingOut) {
@@ -719,6 +719,87 @@ class DriverRepositoryImpl implements DriverRepository {
       return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
     } catch (e) {
       print('   ❌ Unexpected error: ${e.toString()}');
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
+    }
+  }
+
+  @override
+  Future<Result<Map<String, dynamic>>> getOwnerInvitations() async {
+    final tokenResult = await getStoredToken();
+    String? token;
+    if (tokenResult is Error<String?>) {
+      return Error(AuthenticationFailure('Authentication required. Please login again.'));
+    } else if (tokenResult is Success<String?>) {
+      token = tokenResult.data;
+    }
+    if (token == null || token.isEmpty) {
+      return const Error(AuthenticationFailure('No authentication token. Please login again.'));
+    }
+    try {
+      final data = await remoteDataSource.getOwnerInvitations(token);
+      return Success(data);
+    } on AuthenticationException catch (e) {
+      if (!SessionManager().isLoggingOut) {
+        SessionManager().handleAuthenticationError();
+      }
+      return Error(AuthenticationFailure(e.message));
+    } on ServerException catch (e) {
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
+    } catch (e) {
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
+    }
+  }
+
+  @override
+  Future<Result<Map<String, dynamic>>> acceptOwnerInvitation(String invitationId) async {
+    final tokenResult = await getStoredToken();
+    String? token;
+    if (tokenResult is Error<String?>) {
+      return Error(AuthenticationFailure('Authentication required. Please login again.'));
+    } else if (tokenResult is Success<String?>) {
+      token = tokenResult.data;
+    }
+    if (token == null || token.isEmpty) {
+      return const Error(AuthenticationFailure('No authentication token. Please login again.'));
+    }
+    try {
+      final data = await remoteDataSource.acceptOwnerInvitation(token, invitationId);
+      return Success(data);
+    } on AuthenticationException catch (e) {
+      if (!SessionManager().isLoggingOut) {
+        SessionManager().handleAuthenticationError();
+      }
+      return Error(AuthenticationFailure(e.message));
+    } on ServerException catch (e) {
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
+    } catch (e) {
+      return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
+    }
+  }
+
+  @override
+  Future<Result<Map<String, dynamic>>> rejectOwnerInvitation(String invitationId) async {
+    final tokenResult = await getStoredToken();
+    String? token;
+    if (tokenResult is Error<String?>) {
+      return Error(AuthenticationFailure('Authentication required. Please login again.'));
+    } else if (tokenResult is Success<String?>) {
+      token = tokenResult.data;
+    }
+    if (token == null || token.isEmpty) {
+      return const Error(AuthenticationFailure('No authentication token. Please login again.'));
+    }
+    try {
+      final data = await remoteDataSource.rejectOwnerInvitation(token, invitationId);
+      return Success(data);
+    } on AuthenticationException catch (e) {
+      if (!SessionManager().isLoggingOut) {
+        SessionManager().handleAuthenticationError();
+      }
+      return Error(AuthenticationFailure(e.message));
+    } on ServerException catch (e) {
+      return Error(ServerFailure(ErrorMessageSanitizer.sanitizeRawServerMessage(e.message)));
+    } catch (e) {
       return Error(ServerFailure(ErrorMessageSanitizer.getGenericErrorMessage()));
     }
   }

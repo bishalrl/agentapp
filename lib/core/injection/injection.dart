@@ -21,9 +21,13 @@ import '../../features/bus_driver/domain/usecases/driver_login.dart';
 import '../../features/bus_driver/domain/usecases/get_driver_dashboard.dart';
 import '../../features/bus_driver/domain/usecases/update_driver_profile.dart';
 import '../../features/bus_driver/domain/usecases/mark_bus_as_reached.dart';
+import '../../features/bus_driver/domain/usecases/stop_location_sharing.dart';
 import '../../features/bus_driver/domain/usecases/get_pending_requests.dart';
 import '../../features/bus_driver/domain/usecases/accept_request.dart';
 import '../../features/bus_driver/domain/usecases/reject_request.dart';
+import '../../features/bus_driver/domain/usecases/get_owner_invitations.dart';
+import '../../features/bus_driver/domain/usecases/accept_owner_invitation.dart';
+import '../../features/bus_driver/domain/usecases/reject_owner_invitation.dart';
 import '../../features/bus_driver/domain/usecases/get_bus_details.dart' as driver_usecases;
 import '../../features/bus_driver/domain/usecases/initiate_ride.dart';
 import '../../features/bus_driver/domain/usecases/update_driver_location.dart';
@@ -69,6 +73,8 @@ import '../../features/authentication/domain/usecases/change_password.dart';
 import '../../features/authentication/domain/usecases/forgot_password.dart';
 import '../../features/authentication/domain/usecases/reset_password.dart';
 import '../../features/authentication/domain/usecases/logout.dart';
+import '../../features/authentication/domain/usecases/send_otp.dart';
+import '../../features/authentication/domain/usecases/verify_otp_login.dart';
 import '../../features/authentication/domain/usecases/get_stored_token.dart';
 import '../../features/authentication/domain/usecases/get_stored_session_type.dart';
 import '../../features/authentication/domain/usecases/clear_token.dart';
@@ -237,9 +243,13 @@ Future<void> init() async {
         getDashboard: sl(),
         updateProfile: sl(),
         markBusAsReached: sl(),
+        stopLocationSharing: sl(),
         getPendingRequests: sl(),
         acceptRequest: sl(),
         rejectRequest: sl(),
+        getOwnerInvitations: sl(),
+        acceptOwnerInvitation: sl(),
+        rejectOwnerInvitation: sl(),
         getBusDetails: sl(),
         initiateRide: sl(),
         updateDriverLocation: sl(),
@@ -260,9 +270,13 @@ Future<void> init() async {
   sl.registerLazySingleton(() => GetDriverDashboard(sl()));
   sl.registerLazySingleton(() => UpdateDriverProfile(sl()));
   sl.registerLazySingleton(() => MarkBusAsReached(sl()));
+  sl.registerLazySingleton(() => StopLocationSharing(sl()));
   sl.registerLazySingleton(() => GetPendingRequests(sl()));
   sl.registerLazySingleton(() => AcceptRequest(sl()));
   sl.registerLazySingleton(() => RejectRequest(sl()));
+  sl.registerLazySingleton(() => GetOwnerInvitations(sl()));
+  sl.registerLazySingleton(() => AcceptOwnerInvitation(sl()));
+  sl.registerLazySingleton(() => RejectOwnerInvitation(sl()));
   sl.registerLazySingleton(() => driver_usecases.GetBusDetails(sl()));
   sl.registerLazySingleton(() => InitiateRide(sl()));
   sl.registerLazySingleton(() => UpdateDriverLocation(sl()));
@@ -302,6 +316,7 @@ Future<void> init() async {
         updateBookingStatus: sl(),
         lockSeats: sl(),
         unlockSeats: sl(),
+        releaseWalletHold: sl(),
       ));
 
   // Use cases
@@ -364,7 +379,10 @@ Future<void> init() async {
         logout: sl(),
         getStoredToken: sl(),
       ));
-  sl.registerFactory(() => SignupBloc(signup: sl()));
+  sl.registerFactory(() => SignupBloc(
+        signup: sl(),
+        sendOtp: sl(),
+      ));
   sl.registerFactory(() => ChangePasswordBloc(
         changePassword: sl(),
         getStoredToken: sl(),
@@ -383,6 +401,8 @@ Future<void> init() async {
   sl.registerLazySingleton(() => ForgotPassword(sl()));
   sl.registerLazySingleton(() => ResetPassword(sl()));
   sl.registerLazySingleton(() => Logout(sl()));
+  sl.registerLazySingleton(() => SendOtp(sl()));
+  sl.registerLazySingleton(() => VerifyOtpLogin(sl()));
   sl.registerLazySingleton(() => GetStoredToken(sl()));
   sl.registerLazySingleton(() => GetStoredSessionType(sl()));
   sl.registerLazySingleton(() => ClearToken(sl()));

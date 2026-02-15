@@ -3,6 +3,7 @@ import '../../../../core/constants/api_constants.dart';
 import '../../../../core/errors/exceptions.dart';
 import '../../../../core/network/api_client.dart';
 import '../../../../core/network/multipart_client.dart';
+import '../../../../core/utils/phone_normalizer.dart';
 import '../models/driver_model.dart';
 
 abstract class DriverRemoteDataSource {
@@ -45,7 +46,7 @@ abstract class DriverRemoteDataSource {
   }); // Update driver profile
   Future<List<BusModel>> getAssignedBuses(String token);
   Future<void> startLocationSharing(String token, String busId);
-  Future<void> stopLocationSharing(String token);
+  Future<void> stopLocationSharing(String token, {String? busId});
   Future<void> updateLocation(String token, {
     required String busId,
     required double latitude,
@@ -59,6 +60,10 @@ abstract class DriverRemoteDataSource {
   Future<Map<String, dynamic>> getPendingRequests(String token); // Get pending bus assignment requests
   Future<Map<String, dynamic>> acceptRequest(String token, String requestId); // Accept bus assignment request
   Future<Map<String, dynamic>> rejectRequest(String token, String requestId); // Reject bus assignment request
+  // Owner join flow: list / accept / reject owner invitations (already-registered driver)
+  Future<Map<String, dynamic>> getOwnerInvitations(String token);
+  Future<Map<String, dynamic>> acceptOwnerInvitation(String token, String invitationId);
+  Future<Map<String, dynamic>> rejectOwnerInvitation(String token, String invitationId);
   Future<Map<String, dynamic>> getBusDetails(String token, String busId); // Get detailed bus information with full passenger data
   
   // Driver Ride Management
@@ -429,13 +434,15 @@ class DriverRemoteDataSourceImpl implements DriverRemoteDataSource {
   }
   
   @override
-  Future<void> stopLocationSharing(String token) async {
+  Future<void> stopLocationSharing(String token, {String? busId}) async {
     try {
+      final body = busId != null && busId.isNotEmpty ? {'busId': busId} : null;
       final response = await apiClient.post(
         ApiConstants.driverLocationStop,
         headers: {
           ApiConstants.authorizationHeader: '${ApiConstants.bearerPrefix}$token',
         },
+        body: body,
       );
       
       if (response['success'] != true) {
@@ -688,6 +695,72 @@ class DriverRemoteDataSourceImpl implements DriverRemoteDataSource {
   }
 
   @override
+  Future<Map<String, dynamic>> getOwnerInvitations(String token) async {
+    try {
+      final response = await apiClient.get(
+        ApiConstants.driverOwnerInvitations,
+        headers: {
+          ApiConstants.authorizationHeader: '${ApiConstants.bearerPrefix}$token',
+        },
+      );
+      if (response['success'] == true && response['data'] != null) {
+        return response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : {'invitations': response['data'] is List ? response['data'] : []};
+      }
+      throw ServerException(response['message'] as String? ?? 'Failed to get owner invitations');
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException('Failed to get owner invitations: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> acceptOwnerInvitation(String token, String invitationId) async {
+    try {
+      final response = await apiClient.post(
+        '${ApiConstants.driverOwnerInvitationAccept}/$invitationId/accept',
+        headers: {
+          ApiConstants.authorizationHeader: '${ApiConstants.bearerPrefix}$token',
+        },
+      );
+      if (response['success'] == true) {
+        return response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : <String, dynamic>{};
+      }
+      throw ServerException(response['message'] as String? ?? 'Failed to accept owner invitation');
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException('Failed to accept owner invitation: ${e.toString()}');
+    }
+  }
+
+  @override
+  Future<Map<String, dynamic>> rejectOwnerInvitation(String token, String invitationId) async {
+    try {
+      final response = await apiClient.post(
+        '${ApiConstants.driverOwnerInvitationReject}/$invitationId/reject',
+        headers: {
+          ApiConstants.authorizationHeader: '${ApiConstants.bearerPrefix}$token',
+        },
+      );
+      if (response['success'] == true) {
+        return response['data'] is Map<String, dynamic>
+            ? response['data'] as Map<String, dynamic>
+            : <String, dynamic>{};
+      }
+      throw ServerException(response['message'] as String? ?? 'Failed to reject owner invitation');
+    } on ServerException {
+      rethrow;
+    } catch (e) {
+      throw ServerException('Failed to reject owner invitation: ${e.toString()}');
+    }
+  }
+
+  @override
   Future<Map<String, dynamic>> getBusDetails(String token, String busId) async {
     try {
       print('📤 DriverRemoteDataSource.getBusDetails: Sending request');
@@ -830,11 +903,16 @@ class DriverRemoteDataSourceImpl implements DriverRemoteDataSource {
         return str;
       }).where((seat) => seat != null).toList();
       
+      final normalizedContact = PhoneNormalizer.normalizeNepalPhone(contactNumber);
+      final contactForApi = PhoneNormalizer.isValidNormalizedNepalMobile(normalizedContact)
+          ? normalizedContact
+          : contactNumber;
+
       final body = <String, dynamic>{
         'busId': busId,
         'seatNumbers': normalizedSeatNumbers,
         'passengerName': passengerName,
-        'contactNumber': contactNumber,
+        'contactNumber': contactForApi,
         'paymentMethod': paymentMethod,
       };
       

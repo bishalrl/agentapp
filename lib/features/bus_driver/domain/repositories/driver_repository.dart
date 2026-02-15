@@ -41,7 +41,7 @@ abstract class DriverRepository {
   }); // Update driver profile
   Future<Result<List<BusEntity>>> getAssignedBuses();
   Future<Result<void>> startLocationSharing(String busId);
-  Future<Result<void>> stopLocationSharing();
+  Future<Result<void>> stopLocationSharing({String? busId});
   Future<Result<void>> updateLocation({
     required String busId,
     required double latitude,
@@ -55,6 +55,10 @@ abstract class DriverRepository {
   Future<Result<Map<String, dynamic>>> getPendingRequests(); // Get pending bus assignment requests
   Future<Result<Map<String, dynamic>>> acceptRequest(String requestId); // Accept bus assignment request
   Future<Result<Map<String, dynamic>>> rejectRequest(String requestId); // Reject bus assignment request
+  // Owner join flow: list / accept / reject owner invitations (already-registered driver)
+  Future<Result<Map<String, dynamic>>> getOwnerInvitations();
+  Future<Result<Map<String, dynamic>>> acceptOwnerInvitation(String invitationId);
+  Future<Result<Map<String, dynamic>>> rejectOwnerInvitation(String invitationId);
   Future<Result<Map<String, dynamic>>> getBusDetails(String busId); // Get detailed bus information with full passenger data
   
   // Driver Ride Management

@@ -74,7 +74,13 @@ class DriverLoginEvent extends DriverEvent {
 }
 
 class GetDriverDashboardEvent extends DriverEvent {
-  const GetDriverDashboardEvent();
+  /// When true, skips 5-minute throttle and fetches from API.
+  final bool forceRefresh;
+
+  const GetDriverDashboardEvent({this.forceRefresh = false});
+
+  @override
+  List<Object?> get props => [forceRefresh];
 }
 
 class UpdateDriverProfileEvent extends DriverEvent {
@@ -170,6 +176,16 @@ class MarkBusAsReachedEvent extends DriverEvent {
   List<Object?> get props => [busId];
 }
 
+class StopLocationSharingEvent extends DriverEvent {
+  /// Optional. When ending a ride from the map, pass [busId] so the backend can target that bus.
+  final String? busId;
+
+  const StopLocationSharingEvent({this.busId});
+
+  @override
+  List<Object?> get props => [busId];
+}
+
 class GetPendingRequestsEvent extends DriverEvent {
   const GetPendingRequestsEvent();
 }
@@ -190,6 +206,32 @@ class RejectRequestEvent extends DriverEvent {
 
   @override
   List<Object?> get props => [requestId];
+}
+
+/// Owner join flow: already-registered driver sees owner invitations and can accept/reject.
+class GetOwnerInvitationsEvent extends DriverEvent {
+  const GetOwnerInvitationsEvent();
+
+  @override
+  List<Object?> get props => [];
+}
+
+class AcceptOwnerInvitationEvent extends DriverEvent {
+  final String invitationId;
+
+  const AcceptOwnerInvitationEvent({required this.invitationId});
+
+  @override
+  List<Object?> get props => [invitationId];
+}
+
+class RejectOwnerInvitationEvent extends DriverEvent {
+  final String invitationId;
+
+  const RejectOwnerInvitationEvent({required this.invitationId});
+
+  @override
+  List<Object?> get props => [invitationId];
 }
 
 class GetBusDetailsEvent extends DriverEvent {

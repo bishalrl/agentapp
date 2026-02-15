@@ -28,41 +28,38 @@ class StepProgressIndicator extends StatelessWidget {
             final isCurrent = stepNumber == currentStep;
             final isPending = stepNumber > currentStep;
 
+            final primary = theme.colorScheme.primary;
+            final inactive = theme.dividerColor;
+
             return Expanded(
               child: Row(
                 children: [
                   Expanded(
                     child: Container(
                       height: 2,
-                      color: isCompleted || isCurrent
-                          ? AppTheme.primaryColor
-                          : AppTheme.lightBorderColor,
+                      color: isCompleted || isCurrent ? primary : inactive,
                     ),
                   ),
                   Container(
                     width: 32,
                     height: 32,
                     decoration: BoxDecoration(
-                      color: isCompleted
-                          ? AppTheme.primaryColor
-                          : isCurrent
-                              ? AppTheme.primaryColor
-                              : AppTheme.lightBorderColor,
+                      color: isCompleted || isCurrent ? primary : inactive,
                       shape: BoxShape.circle,
                     ),
                     child: Center(
                       child: isCompleted
-                          ? const Icon(
+                          ? Icon(
                               Icons.check,
-                              color: Colors.white,
+                              color: theme.colorScheme.onPrimary,
                               size: 18,
                             )
                           : Text(
                               stepNumber.toString(),
                               style: TextStyle(
                                 color: isCurrent
-                                    ? Colors.white
-                                    : AppTheme.textSecondary,
+                                    ? theme.colorScheme.onPrimary
+                                    : theme.colorScheme.onSurface.withOpacity(0.6),
                                 fontWeight: FontWeight.bold,
                                 fontSize: 14,
                               ),
@@ -73,9 +70,7 @@ class StepProgressIndicator extends StatelessWidget {
                     Expanded(
                       child: Container(
                         height: 2,
-                        color: isCompleted
-                            ? AppTheme.primaryColor
-                            : AppTheme.lightBorderColor,
+                        color: isCompleted ? primary : inactive,
                       ),
                     ),
                 ],
@@ -99,8 +94,8 @@ class StepProgressIndicator extends StatelessWidget {
                   textAlign: TextAlign.center,
                   style: theme.textTheme.bodySmall?.copyWith(
                     color: isCurrent || isCompleted
-                        ? AppTheme.primaryColor
-                        : AppTheme.textSecondary,
+                        ? theme.colorScheme.primary
+                        : theme.colorScheme.onSurface.withOpacity(0.7),
                     fontWeight: isCurrent ? FontWeight.w600 : FontWeight.normal,
                   ),
                   maxLines: 1,

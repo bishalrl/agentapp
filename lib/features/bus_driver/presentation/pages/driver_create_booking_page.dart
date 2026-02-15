@@ -3,6 +3,7 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../../../core/widgets/enhanced_card.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/error_snackbar.dart';
+import '../../../../core/utils/phone_normalizer.dart';
 import '../bloc/driver_bloc.dart';
 import '../bloc/events/driver_event.dart';
 import '../bloc/states/driver_state.dart';
@@ -76,6 +77,19 @@ class _DriverCreateBookingPageState extends State<DriverCreateBookingPage> {
       return;
     }
 
+    // Normalize and validate contact number
+    final rawContact = _contactNumberController.text.trim();
+    final normalizedContact = PhoneNormalizer.normalizeNepalPhone(rawContact);
+    if (!PhoneNormalizer.isValidNormalizedNepalMobile(normalizedContact)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        ErrorSnackBar(
+          message: 'Please enter a valid 10-digit Nepal mobile number (98XXXXXXXX).',
+          errorSource: 'Driver Booking',
+        ),
+      );
+      return;
+    }
+
     setState(() {
       _hasSubmitted = true;
     });
@@ -85,7 +99,7 @@ class _DriverCreateBookingPageState extends State<DriverCreateBookingPage> {
         busId: _selectedBusId!,
         seatNumbers: _selectedSeats,
         passengerName: _passengerNameController.text.trim(),
-        contactNumber: _contactNumberController.text.trim(),
+        contactNumber: normalizedContact,
         passengerEmail: _passengerEmailController.text.trim().isEmpty
             ? null
             : _passengerEmailController.text.trim(),

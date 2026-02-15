@@ -29,11 +29,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
   ) async {
     print('🔵 AuthBloc._onLogin called');
     print('   Event: ${event.runtimeType}');
-    print('   Email: ${event.email}');
+    print('   Phone: ${event.phone}');
     emit(state.copyWith(isLoading: true, errorMessage: null));
     print('   State emitted: isLoading=true');
 
-    final result = await login(event.email, event.password);
+    final result = await login(event.phone, event.password);
 
     if (result is Error<AuthEntity>) {
       final failure = result.failure;

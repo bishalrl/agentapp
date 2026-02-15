@@ -136,14 +136,7 @@ class MultipartClient {
         final responseBody = response.body;
         final parsed = _parseResponse(responseBody);
         print('   ✅ Response parsed successfully');
-        // For 201 Created, return success with message
-        if (response.statusCode == 201) {
-          return {
-            'success': true,
-            'message': parsed['message'] as String? ?? 
-              'Registration successful! We will review your documents and contact you by email after verification.',
-          };
-        }
+        // Return full parsed response (including data, token, etc.) for all 2xx
         return parsed;
       } else {
         print('   ❌ Error Response: ${response.statusCode}');
@@ -393,14 +386,6 @@ class MultipartClient {
         final responseBody = response.body;
         final parsed = _parseResponse(responseBody);
         print('   ✅ Redirected request successful');
-        // For 201 Created, return success with message
-        if (response.statusCode == 201) {
-          return {
-            'success': true,
-            'message': parsed['message'] as String? ?? 
-              'Registration successful! We will review your documents and contact you by email after verification.',
-          };
-        }
         return parsed;
       } else {
         // Handle error from redirected request

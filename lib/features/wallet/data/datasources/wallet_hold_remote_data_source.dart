@@ -68,20 +68,26 @@ class WalletHoldRemoteDataSourceImpl implements WalletHoldRemoteDataSource {
         body: body,
       );
 
+      // Backend may return { success: true, data: { ... } } or the hold object at top level (e.g. 200 with body = hold)
+      Map<String, dynamic>? data;
       if (response['success'] == true && response['data'] != null) {
-        final data = response['data'] as Map<String, dynamic>;
-        // Backend might return additional fields, ensure we have required fields
-        // If holdId is missing, try 'id' field
+        data = response['data'] as Map<String, dynamic>;
+      } else if (response['success'] != false &&
+          (response['holdId'] != null || response['id'] != null)) {
+        // Unwrapped: response is the hold object itself
+        data = Map<String, dynamic>.from(response);
+      }
+
+      if (data != null) {
         if (!data.containsKey('holdId') && data.containsKey('id')) {
           data['holdId'] = data['id'];
         }
         return WalletHoldModel.fromJson(data);
-      } else {
-        final error = response['error'] as Map<String, dynamic>?;
-        final message = error?['message'] as String? ?? 'Failed to create wallet hold';
-        final code = error?['code'] as String?;
-        throw ServerException(message);
       }
+
+      final error = response['error'] as Map<String, dynamic>?;
+      final message = error?['message'] as String? ?? 'Failed to create wallet hold';
+      throw ServerException(message);
     } on ServerException {
       rethrow;
     } catch (e) {

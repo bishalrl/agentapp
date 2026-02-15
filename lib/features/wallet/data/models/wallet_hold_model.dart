@@ -16,15 +16,26 @@ class WalletHoldModel extends WalletHoldEntity {
   factory WalletHoldModel.fromJson(Map<String, dynamic> json) {
     // Backend returns 'holdId' or 'id' - handle both
     final holdId = json['holdId'] as String? ?? json['id'] as String? ?? '';
-    
+    final amount = (json['amount'] as num?)?.toDouble() ?? 0.0;
+    final status = json['status'] as String? ?? 'active';
+    // Backend may use 'holdExpiresAt' instead of 'expiresAt'
+    final expiresAtStr = json['expiresAt'] as String? ?? json['holdExpiresAt'] as String?;
+    final createdAtStr = json['createdAt'] as String?;
+    final createdAt = createdAtStr != null
+        ? DateTime.parse(createdAtStr)
+        : DateTime.now().toUtc();
+    final expiresAt = expiresAtStr != null
+        ? DateTime.parse(expiresAtStr)
+        : createdAt.add(const Duration(hours: 1));
+
     return WalletHoldModel(
       holdId: holdId,
-      amount: (json['amount'] as num).toDouble(),
-      status: json['status'] as String,
+      amount: amount,
+      status: status,
       description: json['description'] as String?,
       bookingId: json['bookingId'] as String?,
-      createdAt: DateTime.parse(json['createdAt'] as String),
-      expiresAt: DateTime.parse(json['expiresAt'] as String),
+      createdAt: createdAt,
+      expiresAt: expiresAt,
       confirmedAt: json['confirmedAt'] != null
           ? DateTime.parse(json['confirmedAt'] as String)
           : null,

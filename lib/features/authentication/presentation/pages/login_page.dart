@@ -4,12 +4,8 @@ import 'package:go_router/go_router.dart';
 import '../bloc/auth_bloc.dart';
 import '../bloc/events/auth_event.dart';
 import '../bloc/states/auth_state.dart';
-import '../bloc/login_page_bloc.dart';
-import '../bloc/events/login_page_event.dart';
-import '../bloc/states/login_page_state.dart';
 import '../../../../core/widgets/error_snackbar.dart';
 import '../../../../core/widgets/back_button_handler.dart';
-import '../../../../core/utils/bloc_extensions.dart';
 import '../../../../core/theme/app_theme.dart';
 
 class LoginPage extends StatelessWidget {
@@ -18,10 +14,7 @@ class LoginPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // AuthBloc is already provided at app level, no need to recreate it
-    return BlocProvider(
-      create: (context) => LoginPageBloc(),
-      child: const _LoginPageView(),
-    );
+    return const _LoginPageView();
   }
 }
 
@@ -34,13 +27,14 @@ class _LoginPageView extends StatefulWidget {
 
 class _LoginPageViewState extends State<_LoginPageView> {
   final formKey = GlobalKey<FormState>();
-  final emailController = TextEditingController();
+  final phoneController = TextEditingController();
   final passwordController = TextEditingController();
+  bool _obscurePassword = true;
   bool _isNavigating = false;
 
   @override
   void dispose() {
-    emailController.dispose();
+    phoneController.dispose();
     passwordController.dispose();
     super.dispose();
   }
@@ -102,9 +96,7 @@ class _LoginPageViewState extends State<_LoginPageView> {
               }
             },
             builder: (context, authState) {
-              return BlocBuilder<LoginPageBloc, LoginPageState>(
-                builder: (context, pageState) {
-                  return SingleChildScrollView(
+              return SingleChildScrollView(
                     padding: const EdgeInsets.all(24.0),
                     child: Form(
                       key: formKey,
@@ -152,23 +144,23 @@ class _LoginPageViewState extends State<_LoginPageView> {
                               child: Column(
                                 children: [
                                   TextFormField(
-                                    controller: emailController,
-                                    keyboardType: TextInputType.emailAddress,
+                                    controller: phoneController,
+                                    keyboardType: TextInputType.phone,
                                     decoration: InputDecoration(
-                                      labelText: 'Email',
-                                      prefixIcon: const Icon(Icons.email),
+                                      labelText: 'Phone Number',
+                                      prefixIcon: const Icon(Icons.phone),
                                       border: OutlineInputBorder(
                                         borderRadius: BorderRadius.circular(12),
                                       ),
                                       filled: true,
                                     ),
                                     validator: (value) {
-                                      if (value == null || value.isEmpty) {
-                                        return 'Please enter email';
+                                      final trimmed = value?.trim() ?? '';
+                                      if (trimmed.isEmpty) {
+                                        return 'Please enter phone number';
                                       }
-                                      final trimmed = value.trim();
-                                      if (!trimmed.contains('@')) {
-                                        return 'Please enter a valid email';
+                                      if (trimmed.length < 10) {
+                                        return 'Please enter a valid phone number';
                                       }
                                       return null;
                                     },
@@ -176,20 +168,20 @@ class _LoginPageViewState extends State<_LoginPageView> {
                                   const SizedBox(height: 16),
                                   TextFormField(
                                     controller: passwordController,
-                                    obscureText: pageState.obscurePassword,
+                                    obscureText: _obscurePassword,
                                     decoration: InputDecoration(
                                       labelText: 'Password',
                                       prefixIcon: const Icon(Icons.lock),
                                       suffixIcon: IconButton(
                                         icon: Icon(
-                                          pageState.obscurePassword
+                                          _obscurePassword
                                               ? Icons.visibility
                                               : Icons.visibility_off,
                                         ),
                                         onPressed: () {
-                                          context
-                                              .read<LoginPageBloc>()
-                                              .safeAdd(const TogglePasswordVisibilityEvent());
+                                          setState(() {
+                                            _obscurePassword = !_obscurePassword;
+                                          });
                                         },
                                       ),
                                       border: OutlineInputBorder(
@@ -222,8 +214,8 @@ class _LoginPageViewState extends State<_LoginPageView> {
                                                     print('📤 Adding LoginEvent to AuthBloc');
                                                     authBloc.add(
                                                       LoginEvent(
-                                                        email: emailController.text.trim(),
-                                                        password: passwordController.text.trim(),
+                                                        phone: phoneController.text.trim(),
+                                                        password: passwordController.text,
                                                       ),
                                                     );
                                                     print('✅ LoginEvent added successfully');
@@ -322,12 +314,8 @@ class _LoginPageViewState extends State<_LoginPageView> {
                     ),
                   );
                 },
-              );
-            },
-          ),
-        ),
-      ),
-    );
+              )
+    )));
   }
 }
 

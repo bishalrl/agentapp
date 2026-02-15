@@ -1,23 +1,19 @@
 class ApiConstants {
-  // Base URLs
-  // ⚠️ IMPORTANT: Update this to your actual server IP address
-  // For local development, use: http://YOUR_IP_ADDRESS:5000/api
-  // To find your IP: Windows (ipconfig) or Mac/Linux (ifconfig)
-  
-  // Development/Testing (Local Network)
-  // Backend Server IP: 192.168.1.68
-  // Backend Server Port: 5000
-  static const String baseUrl = 'http://147.93.152.80:5000/api';
-  
-  // Development URLs (for local testing)
-  static const String devBaseUrl = 'http://147.93.152.80:5000/api';
-  
-  // Production (Update when deployed)
-  // static const String baseUrl = 'https://your-production-domain.com/api';
-  
-  // Localhost (for emulator)
+  // Base URLs - Local testing
+  // On this PC:        http://localhost:5000
+  // From phone/device: http://192.168.1.68:5000 (same Wi‑Fi)
+  //
+  // Use 192.168.1.68 when testing from a physical phone or another machine on your network.
+  // Use localhost (or 10.0.2.2 on Android emulator) when testing on same PC only.
+    static const String baseUrl = 'http://192.168.1.68:5000/api';
+   // 'http://147.93.152.80:5000/api';
+
+  // Same PC only (emulator / same machine)
+  // static const String baseUrl = 'http://localhost:5000/api';
   // static const String baseUrl = 'http://10.0.2.2:5000/api'; // Android emulator
-  // static const String baseUrl = 'http://localhost:5000/api'; // iOS simulator
+
+  // Production (when deployed)
+  // static const String baseUrl = 'https://your-production-domain.com/api';
   
   // API Endpoints
   static const String driverInvite = '/driver/invite';
@@ -36,6 +32,10 @@ class ApiConstants {
   static const String driverPendingRequests = '/driver/pending-requests';
   static const String driverAcceptRequest = '/driver/accept-request'; // POST /:requestId
   static const String driverRejectRequest = '/driver/reject-request'; // POST /:requestId
+  // Owner join flow (already-registered driver): list / accept / reject owner invitations
+  static const String driverOwnerInvitations = '/driver/owner-invitations';
+  static const String driverOwnerInvitationAccept = '/driver/owner-invitations'; // POST /:invitationId/accept
+  static const String driverOwnerInvitationReject = '/driver/owner-invitations'; // POST /:invitationId/reject
   
   // Driver Ride Management
   static const String driverRideInitiate = '/driver/ride/initiate'; // POST
@@ -64,6 +64,8 @@ class ApiConstants {
   static const String seatLockMyLocks = '/seat-lock/my-locks';
   
   // Authentication
+  static const String authSendOtp = '/auth/send-otp';
+  static const String authVerifyOtpLogin = '/auth/verify-otp-login';
   static const String counterRegister = '/auth/register-bus-agent';
   static const String counterLogin = '/auth/login-bus-agent';
   static const String counterChangePassword = '/auth/bus-agent-change-password';

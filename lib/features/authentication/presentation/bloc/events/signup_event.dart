@@ -20,6 +20,7 @@ class SignupRequestEvent extends SignupEvent {
   final bool hasInternetAccess;
   final String preferredBookingMethod;
   final String password;
+  final String otp;
   final File citizenshipFile;
   final File photoFile;
   final String? panVatNumber;
@@ -50,6 +51,7 @@ class SignupRequestEvent extends SignupEvent {
     this.whatsappViber,
     this.panFile,
     this.registrationFile,
+    required this.otp,
   });
 
   @override
@@ -75,5 +77,15 @@ class SignupRequestEvent extends SignupEvent {
         whatsappViber,
         panFile,
         registrationFile,
+        otp,
       ];
+}
+
+class SignupSendOtpEvent extends SignupEvent {
+  final String phone;
+
+  const SignupSendOtpEvent({required this.phone});
+
+  @override
+  List<Object?> get props => [phone];
 }

@@ -77,6 +77,17 @@ class ErrorMessageSanitizer {
   static String _sanitizeServerError(String message) {
     final lowerMessage = message.toLowerCase();
     
+    // Seat / counter permission errors — never show "Not allowed seats", "Allowed seats", or backend detail
+    if (lowerMessage.contains('not allowed seats') ||
+        lowerMessage.contains('allowed seats') ||
+        lowerMessage.contains('not allowed seats') ||
+        lowerMessage.contains('do not have permission to book') ||
+        lowerMessage.contains('requestedSeats') ||
+        lowerMessage.contains('notAllowedSeats')) {
+      return 'Booking could not be completed. Your counter does not have permission to book these seats on this bus. '
+          'If you have sufficient wallet balance and are paying by wallet, request bus access for this counter or contact support.';
+    }
+    
     // Check for common error patterns and provide user-friendly messages
     if (lowerMessage.contains('500') || 
         lowerMessage.contains('internal server error') ||

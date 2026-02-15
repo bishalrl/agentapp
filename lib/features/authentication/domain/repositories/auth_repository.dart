@@ -3,7 +3,17 @@ import '../entities/auth_entity.dart';
 import 'dart:io';
 
 abstract class AuthRepository {
-  Future<Result<AuthEntity>> login(String email, String password);
+  Future<Result<AuthEntity>> login(String phone, String password);
+  Future<Result<void>> sendOtp({
+    required String phone,
+    String purpose,
+    String userType,
+  });
+  Future<Result<AuthEntity>> verifyOtpLogin({
+    required String phone,
+    required String otp,
+    String userType,
+  });
   Future<Result<AuthEntity>> signup({
     required String agencyName,
     required String ownerName,
@@ -26,6 +36,7 @@ abstract class AuthRepository {
     String? whatsappViber,
     File? panFile,
     File? registrationFile,
+    required String otp,
   });
   Future<Result<void>> changePassword(String currentPassword, String newPassword, String token);
   Future<Result<void>> forgotPassword(String email);

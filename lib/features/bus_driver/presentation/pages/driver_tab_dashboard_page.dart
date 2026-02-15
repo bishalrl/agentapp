@@ -35,10 +35,11 @@ class _DriverTabDashboardPageState extends State<DriverTabDashboardPage> {
     return BlocProvider(
       create: (context) {
         final bloc = di.sl<DriverBloc>();
-        // Initial load: dashboard, assigned buses, and pending requests
+        // Initial load: dashboard, assigned buses, pending requests, and owner invitations (for already-registered driver join flow)
         bloc.add(const GetDriverDashboardEvent());
         bloc.add(const GetAssignedBusesEvent());
         bloc.add(const GetPendingRequestsEvent());
+        bloc.add(const GetOwnerInvitationsEvent());
         return bloc;
       },
       child: Scaffold(
@@ -49,10 +50,10 @@ class _DriverTabDashboardPageState extends State<DriverTabDashboardPage> {
               icon: const Icon(Icons.refresh),
               onPressed: () {
                 final bloc = context.read<DriverBloc>();
-                // Reload dashboard, assigned buses and pending requests
-                bloc.add(const GetDriverDashboardEvent());
+                bloc.add(const GetDriverDashboardEvent(forceRefresh: true));
                 bloc.add(const GetAssignedBusesEvent());
                 bloc.add(const GetPendingRequestsEvent());
+                bloc.add(const GetOwnerInvitationsEvent());
               },
               tooltip: 'Refresh',
             ),

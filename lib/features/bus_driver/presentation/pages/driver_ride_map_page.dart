@@ -36,6 +36,22 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
   @override
   void initState() {
     super.initState();
+    // Validate route information first
+    if (widget.from.isEmpty || widget.to.isEmpty) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text(
+                'Route information (From/To) is missing. Map may not display correctly.',
+              ),
+              backgroundColor: Colors.orange,
+              duration: Duration(seconds: 5),
+            ),
+          );
+        }
+      });
+    }
     _checkLocationPermission();
     // Load ride data from BLoC state
     final driverState = context.read<DriverBloc>().state;
@@ -51,13 +67,25 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
   }
 
   Future<void> _checkLocationPermission() async {
+    // Show snackbar asking for location permission
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Requesting location permission to track your ride...'),
+          backgroundColor: Colors.blue,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+
     bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
     if (!serviceEnabled) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Location services are disabled. Please enable them.'),
+            content: Text('Location services are disabled. Please enable them in device settings.'),
             backgroundColor: Colors.orange,
+            duration: Duration(seconds: 4),
           ),
         );
       }
@@ -71,8 +99,9 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
-              content: Text('Location permissions are denied.'),
+              content: Text('Location permission is required to track your ride. Please grant permission.'),
               backgroundColor: Colors.red,
+              duration: Duration(seconds: 4),
             ),
           );
         }
@@ -85,14 +114,25 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text(
-                'Location permissions are permanently denied. Please enable them in settings.'),
+                'Location permissions are permanently denied. Please enable them in app settings.'),
             backgroundColor: Colors.red,
+            duration: Duration(seconds: 5),
           ),
         );
       }
       return;
     }
 
+    // Permission granted, get location
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Location permission granted. Getting your current location...'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
     _getCurrentLocation();
   }
 
@@ -138,7 +178,6 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
     });
 
     if (_isRideActive) {
-      // Start location tracking
       _startLocationTracking();
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -147,11 +186,13 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
         ),
       );
     } else {
-      // Stop location tracking
       _stopLocationTracking();
+      // Notify backend: stop location sharing and set bus inactive (mark reached)
+      context.read<DriverBloc>().add(StopLocationSharingEvent(busId: widget.busId));
+      context.read<DriverBloc>().add(MarkBusAsReachedEvent(busId: widget.busId));
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
-          content: Text('Ride ended. Location tracking stopped.'),
+          content: Text('Ride ended. Bus set to inactive.'),
           backgroundColor: Colors.orange,
         ),
       );
@@ -345,8 +386,41 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
       }
 
       final Map<String, dynamic> route = rawRoute;
-      final fromData = route['from'] as Map<String, dynamic>?;
-      final toData = route['to'] as Map<String, dynamic>?;
+      
+      // Handle from/to: can be string directly OR nested object with 'name' property
+      String fromLocation = widget.from;
+      String toLocation = widget.to;
+      Map<String, dynamic>? fromCoordinates;
+      Map<String, dynamic>? toCoordinates;
+      
+      final dynamic rawFrom = route['from'];
+      if (rawFrom != null) {
+        if (rawFrom is Map<String, dynamic>) {
+          // Nested object format: {name: "kathmandu", coordinates: {...}}
+          fromLocation = rawFrom['name'] as String? ?? widget.from;
+          fromCoordinates = rawFrom['coordinates'] as Map<String, dynamic>?;
+        } else if (rawFrom is String) {
+          // Direct string format: "kathmandu"
+          fromLocation = rawFrom;
+        } else {
+          fromLocation = rawFrom.toString();
+        }
+      }
+      
+      final dynamic rawTo = route['to'];
+      if (rawTo != null) {
+        if (rawTo is Map<String, dynamic>) {
+          // Nested object format: {name: "butwal", coordinates: {...}}
+          toLocation = rawTo['name'] as String? ?? widget.to;
+          toCoordinates = rawTo['coordinates'] as Map<String, dynamic>?;
+        } else if (rawTo is String) {
+          // Direct string format: "butwal"
+          toLocation = rawTo;
+        } else {
+          toLocation = rawTo.toString();
+        }
+      }
+      
       final stops = route['stops'] as List<dynamic>? ?? [];
       
       return Column(
@@ -356,10 +430,10 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
               Expanded(
                 child: _RoutePoint(
                   label: 'From',
-                  location: fromData?['name'] ?? widget.from,
+                  location: fromLocation,
                   icon: Icons.location_on,
                   color: Colors.green,
-                  coordinates: fromData?['coordinates'],
+                  coordinates: fromCoordinates,
                 ),
               ),
               const SizedBox(width: AppTheme.spacingM),
@@ -368,10 +442,10 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
               Expanded(
                 child: _RoutePoint(
                   label: 'To',
-                  location: toData?['name'] ?? widget.to,
+                  location: toLocation,
                   icon: Icons.location_on,
                   color: Colors.red,
-                  coordinates: toData?['coordinates'],
+                  coordinates: toCoordinates,
                 ),
               ),
             ],
@@ -398,6 +472,72 @@ class _DriverRideMapPageState extends State<DriverRideMapPage> {
         ],
       );
     } else {
+      // No route data from API, use widget props
+      final hasFrom = widget.from.isNotEmpty;
+      final hasTo = widget.to.isNotEmpty;
+      
+      if (!hasFrom || !hasTo) {
+        return Container(
+          padding: const EdgeInsets.all(AppTheme.spacingM),
+          decoration: BoxDecoration(
+            color: Colors.orange.shade50,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: Colors.orange.shade300),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Icon(Icons.warning_amber_rounded, color: Colors.orange.shade700, size: 20),
+                  const SizedBox(width: AppTheme.spacingS),
+                  Text(
+                    'Route Information Missing',
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                      color: Colors.orange.shade900,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: AppTheme.spacingS),
+              Text(
+                'From/To location data is not available. The map may not display the route correctly. Please ensure route information is set for this bus.',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Colors.orange.shade800,
+                ),
+              ),
+              if (hasFrom || hasTo) ...[
+                const SizedBox(height: AppTheme.spacingS),
+                Row(
+                  children: [
+                    Expanded(
+                      child: _RoutePoint(
+                        label: 'From',
+                        location: hasFrom ? widget.from : '(not set)',
+                        icon: Icons.location_on,
+                        color: Colors.green,
+                      ),
+                    ),
+                    const SizedBox(width: AppTheme.spacingM),
+                    Icon(Icons.arrow_forward, color: Colors.grey[400]),
+                    const SizedBox(width: AppTheme.spacingM),
+                    Expanded(
+                      child: _RoutePoint(
+                        label: 'To',
+                        location: hasTo ? widget.to : '(not set)',
+                        icon: Icons.location_on,
+                        color: Colors.red,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ],
+          ),
+        );
+      }
+      
       return Row(
         children: [
           Expanded(

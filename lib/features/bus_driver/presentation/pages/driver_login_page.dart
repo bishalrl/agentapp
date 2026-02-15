@@ -32,15 +32,12 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
   final _loginFormKey = GlobalKey<FormState>();
   final _registerFormKey = GlobalKey<FormState>();
   
-  // Login form controllers
-  final _loginEmailController = TextEditingController();
+  // Login form controllers (phone + password only)
   final _loginPhoneController = TextEditingController();
   final _loginPasswordController = TextEditingController();
-  final _loginOtpController = TextEditingController();
-  bool _hasOtpForLogin = false;
   bool _obscureLoginPassword = true;
-  
-  // Registration form controllers
+
+  // Registration form controllers (optional invitation code for owner-join flow)
   final _invitationCodeController = TextEditingController();
   final _emailController = TextEditingController();
   final _registerPhoneController = TextEditingController();
@@ -48,8 +45,6 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
   final _confirmPasswordController = TextEditingController();
   final _nameController = TextEditingController();
   final _licenseNumberController = TextEditingController();
-  final _registrationOtpController = TextEditingController();
-  bool _hasOtpForRegistration = false;
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
   
@@ -62,10 +57,8 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
 
   @override
   void dispose() {
-    _loginEmailController.dispose();
     _loginPhoneController.dispose();
     _loginPasswordController.dispose();
-    _loginOtpController.dispose();
     _invitationCodeController.dispose();
     _emailController.dispose();
     _registerPhoneController.dispose();
@@ -73,7 +66,6 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
     _confirmPasswordController.dispose();
     _nameController.dispose();
     _licenseNumberController.dispose();
-    _registrationOtpController.dispose();
     super.dispose();
   }
 
@@ -105,7 +97,7 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
                 );
               }
               if (state.driver != null) {
-                // Store token if available from registration or OTP verification
+                // Store token if available from registration or login
                 if (state.registrationToken != null) {
                   print('✅ Token received: ${state.registrationToken}');
                   // Store token in secure storage
@@ -250,46 +242,10 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
     return Column(
       children: [
         TextFormField(
-          controller: _loginEmailController,
-          keyboardType: TextInputType.emailAddress,
-          decoration: InputDecoration(
-            labelText: 'Email',
-            hintText: 'driver@example.com',
-            prefixIcon: const Icon(Icons.email),
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(12),
-            ),
-            filled: true,
-            helperText: 'Enter email OR phone number',
-          ),
-          validator: (value) {
-            if ((value == null || value.isEmpty) &&
-                (_loginPhoneController.text.isEmpty)) {
-              return 'Please enter email or phone number';
-            }
-            if (value != null && value.isNotEmpty) {
-              final emailRegex = RegExp(r'^[^@]+@[^@]+\.[^@]+');
-              if (!emailRegex.hasMatch(value)) {
-                return 'Please enter a valid email';
-              }
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        Text(
-          'OR',
-          style: TextStyle(
-            color: Colors.grey[600],
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
           controller: _loginPhoneController,
           keyboardType: TextInputType.phone,
           decoration: InputDecoration(
-            labelText: 'Phone Number',
+            labelText: 'Phone Number *',
             hintText: '+977-9800000000',
             prefixIcon: const Icon(Icons.phone),
             border: OutlineInputBorder(
@@ -298,11 +254,10 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
             filled: true,
           ),
           validator: (value) {
-            if ((value == null || value.isEmpty) &&
-                (_loginEmailController.text.isEmpty)) {
-              return 'Please enter email or phone number';
+            if (value == null || value.isEmpty) {
+              return 'Please enter phone number';
             }
-            if (value != null && value.isNotEmpty && value.length < 10) {
+            if (value.length < 10) {
               return 'Please enter a valid phone number';
             }
             return null;
@@ -331,83 +286,11 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
             if (value == null || value.isEmpty) {
               return 'Please enter password';
             }
+            if (value.length < 6) {
+              return 'Password must be at least 6 characters';
+            }
             return null;
           },
-        ),
-        const SizedBox(height: 16),
-        // OTP for Owner Association (Login)
-        Card(
-          color: Colors.blue.shade50,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _hasOtpForLogin,
-                      onChanged: (value) {
-                        setState(() {
-                          _hasOtpForLogin = value ?? false;
-                          if (!_hasOtpForLogin) {
-                            _loginOtpController.clear();
-                          }
-                        });
-                      },
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'I have an OTP for owner association',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
-                          Text(
-                            'Check this if you received an OTP from owner/counter',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.grey[600],
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (_hasOtpForLogin) ...[
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _loginOtpController,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    decoration: InputDecoration(
-                      labelText: 'OTP Code *',
-                      hintText: 'Enter 6-digit OTP',
-                      prefixIcon: const Icon(Icons.vpn_key),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      counterText: '',
-                      helperText: 'OTP sent to your email by owner/counter',
-                    ),
-                    validator: _hasOtpForLogin ? (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter OTP';
-                      }
-                      if (value.length != 6) {
-                        return 'OTP must be 6 digits';
-                      }
-                      return null;
-                    } : null,
-                  ),
-                ],
-              ],
-            ),
-          ),
         ),
         const SizedBox(height: 24),
         SizedBox(
@@ -417,31 +300,11 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
                 ? null
                 : () {
                     if (_loginFormKey.currentState!.validate()) {
-                      // Validate OTP if hasOTP is checked
-                      if (_hasOtpForLogin && _loginOtpController.text.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(
-                            content: Text('Please enter OTP code'),
-                            backgroundColor: Colors.red,
-                          ),
-                        );
-                        return;
-                      }
-                      
                       if (!mounted) return;
                       context.read<DriverBloc>().add(
                             DriverLoginEvent(
-                              email: _loginEmailController.text.trim().isEmpty
-                                  ? null
-                                  : _loginEmailController.text.trim(),
-                              phoneNumber: _loginPhoneController.text.trim().isEmpty
-                                  ? null
-                                  : _loginPhoneController.text.trim(),
+                              phoneNumber: _loginPhoneController.text.trim(),
                               password: _loginPasswordController.text,
-                              hasOTP: _hasOtpForLogin ? true : null,
-                              otp: _hasOtpForLogin && _loginOtpController.text.isNotEmpty
-                                  ? _loginOtpController.text.trim()
-                                  : null,
                             ),
                           );
                     }
@@ -492,17 +355,16 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
         TextFormField(
           controller: _invitationCodeController,
           decoration: InputDecoration(
-            labelText: 'Invitation Code (Optional)',
-            hintText: 'ABC123',
+            labelText: 'Invitation code (optional)',
+            hintText: 'From SMS when owner adds you',
             prefixIcon: const Icon(Icons.vpn_key),
             border: OutlineInputBorder(
               borderRadius: BorderRadius.circular(12),
             ),
             filled: true,
-            helperText: 'Enter invitation code if you have one',
+            helperText: 'If an owner invited you, enter the code they sent',
           ),
           textCapitalization: TextCapitalization.characters,
-          maxLength: 6,
         ),
         const SizedBox(height: 16),
         TextFormField(
@@ -646,81 +508,6 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
             }
             return null;
           },
-        ),
-        const SizedBox(height: 16),
-        // OTP for Owner Association (Registration)
-        Card(
-          color: Colors.blue.shade50,
-          child: Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Checkbox(
-                      value: _hasOtpForRegistration,
-                      onChanged: (value) {
-                        setState(() {
-                          _hasOtpForRegistration = value ?? false;
-                          if (!_hasOtpForRegistration) {
-                            _registrationOtpController.clear();
-                          }
-                        });
-                      },
-                    ),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'I have an OTP for owner association (Optional)',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w500,
-                                ),
-                          ),
-                          Text(
-                            'Check this if you received an OTP from owner/counter',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Colors.grey[600],
-                                ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-                if (_hasOtpForRegistration) ...[
-                  const SizedBox(height: 12),
-                  TextFormField(
-                    controller: _registrationOtpController,
-                    keyboardType: TextInputType.number,
-                    maxLength: 6,
-                    decoration: InputDecoration(
-                      labelText: 'OTP Code *',
-                      hintText: 'Enter 6-digit OTP',
-                      prefixIcon: const Icon(Icons.vpn_key),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      filled: true,
-                      counterText: '',
-                      helperText: 'OTP sent to your email by owner/counter',
-                    ),
-                    validator: _hasOtpForRegistration ? (value) {
-                      if (value == null || value.isEmpty) {
-                        return 'Please enter OTP';
-                      }
-                      if (value.length != 6) {
-                        return 'OTP must be 6 digits';
-                      }
-                      return null;
-                    } : null,
-                  ),
-                ],
-              ],
-            ),
-          ),
         ),
         const SizedBox(height: 16),
         // License Photo Upload
@@ -923,16 +710,15 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
                       }
                       
                       if (!mounted) return;
-                      
-                      final hasInvitationCode = _invitationCodeController.text.trim().isNotEmpty;
-                      
-                      if (hasInvitationCode) {
-                        // Registration with invitation code (legacy method - automatically associates with owner)
-                        if (!mounted) return;
+                      final invitationCode = _invitationCodeController.text.trim();
+                      if (invitationCode.isNotEmpty) {
+                        // Owner-join flow: driver not registered → register with invitation code from SMS
                         context.read<DriverBloc>().add(
                               RegisterDriverWithInvitationFileEvent(
-                                invitationCode: _invitationCodeController.text.trim().toUpperCase(),
-                                email: _emailController.text.trim(),
+                                invitationCode: invitationCode.toUpperCase(),
+                                email: _emailController.text.trim().isEmpty
+                                    ? _registerPhoneController.text.trim() + '@driver.local'
+                                    : _emailController.text.trim(),
                                 phoneNumber: _registerPhoneController.text.trim(),
                                 password: _passwordController.text,
                                 name: _nameController.text.trim(),
@@ -942,34 +728,18 @@ class _DriverLoginPageViewState extends State<_DriverLoginPageView> {
                               ),
                             );
                       } else {
-                        // Independent registration (can optionally use OTP for owner association)
-                        // Validate OTP if hasOTP is checked
-                        if (_hasOtpForRegistration && _registrationOtpController.text.isEmpty) {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(
-                              content: Text('Please enter OTP code'),
-                              backgroundColor: Colors.red,
-                            ),
-                          );
-                          return;
-                        }
-                        
-                        if (!mounted) return;
+                        // Direct registration; login later with phone + password
                         context.read<DriverBloc>().add(
                               RegisterDriverEvent(
                                 name: _nameController.text.trim(),
                                 phoneNumber: _registerPhoneController.text.trim(),
-                                email: _emailController.text.trim().isEmpty 
-                                    ? null 
+                                email: _emailController.text.trim().isEmpty
+                                    ? null
                                     : _emailController.text.trim(),
                                 password: _passwordController.text,
                                 licenseNumber: _licenseNumberController.text.trim(),
                                 licensePhoto: _licensePhoto,
                                 driverPhoto: _driverPhoto,
-                                hasOTP: _hasOtpForRegistration ? true : null,
-                                otp: _hasOtpForRegistration && _registrationOtpController.text.isNotEmpty
-                                    ? _registrationOtpController.text.trim()
-                                    : null,
                               ),
                             );
                       }
